@@ -13,9 +13,17 @@ public class CinemaBranch {
         this.location = location;
     }
 
-    public void addRoom(CinemaRoom room) {
-        // TODO (A): add the room (don't allow two rooms with the same name)
+    public void addRoom(CinemaRoom room) throws ValidationException {
+        for (CinemaRoom existing : rooms) {
+            if (existing.getRoomName().equalsIgnoreCase(room.getRoomName())) {
+                throw new ValidationException("A room named '" + room.getRoomName() + "' already exists in this branch.");
+            }
+        }
+        rooms.add(room);
     }
 
-    // TODO (A): getters (getBranchId, getBranchName, getLocation, getRooms)
+    public String getBranchId() { return branchId; }
+    public String getBranchName() { return branchName; }
+    public String getLocation() { return location; }
+    public ArrayList<CinemaRoom> getRooms() { return rooms; }
 }
