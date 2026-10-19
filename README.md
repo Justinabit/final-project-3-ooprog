@@ -1,5 +1,4 @@
 # Cinema Booking System (Skeleton)
-mason ako gago
 
 ## How to run
 ```
