@@ -1,11 +1,30 @@
 # Cinema Booking System (Skeleton)
 mason ako gago
 
-## How to run
+## Project structure
 ```
-cd src
-javac *.java
-java Main
+src/cinema/
+├── Main.java        entry point + sample data
+├── model/           User, Admin, Customer, Movie, Showtime, Seat, CinemaRoom,
+│                    CinemaBranch, Booking, Ticket, RegularTicket
+├── service/         UserManager, MovieManager, VenueManager,
+│                    BookingManager (Singleton), ReportService
+├── ui/              AccountMenu, MovieMenu, VenueMenu, BookingMenu
+├── payment/         PaymentStrategy, CashPayment, CardPayment
+├── discount/        DiscountStrategy, NoDiscount, StudentDiscount
+├── exception/       CinemaException + Validation/Login/Booking/PaymentException
+└── util/            Validator, ConsoleReader
+```
+
+## How to run
+From the project root:
+```
+# PowerShell
+javac -d out (Get-ChildItem -Recurse src -Filter *.java).FullName
+# bash / macOS / Linux
+javac -d out $(find src -name "*.java")
+
+java -cp out cinema.Main
 ```
 
 ## Who does what
