@@ -1,12 +1,15 @@
 package cinema.model;
 
+import cinema.exception.ValidationException;
+import cinema.util.Validator;
+
 // [Member A] Customer account
 public class Customer extends User {
-    private int age;   // needed for age-based discounts (Member C)
+    private int age;   // needed for age ratings and age-based discounts
 
-    public Customer(String userId, String name, String email, String password, int age) {
+    public Customer(String userId, String name, String email, String password, int age) throws ValidationException {
         super(userId, name, email, password);
-        this.age = age;
+        setAge(age);
     }
 
     @Override
@@ -14,7 +17,12 @@ public class Customer extends User {
         return "CUSTOMER";
     }
 
-    // TODO (A): add getAge() and setAge() (validate age is realistic, e.g. 1-120)
-    // NOTE: other members call getCustomerId(), getName(), getEmail() -> make sure these exist!
-    //       (you can add getCustomerId() that returns getUserId())
+    public int getAge() { return age; }
+
+    public void setAge(int age) throws ValidationException {
+        Validator.validateAge(age);
+        this.age = age;
+    }
+
+    public String getCustomerId() { return getUserId(); }
 }

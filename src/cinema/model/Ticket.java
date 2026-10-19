@@ -10,9 +10,12 @@ public abstract class Ticket {
         this.seat = seat;
     }
 
-    public abstract double calculatePrice();     // base price x seat multiplier (x discount later)
+    public abstract double calculatePrice();     // base price x seat multiplier (x ticket-type discount)
     public abstract String getTicketType();      // "Regular", "Student", ...
     public String getEligibilityNote() {
         return "No requirements.";               // subclasses can override (e.g. "Valid student ID required")
     }
+
+    public Showtime getShowtime() { return showtime; }
+    public Seat getSeat() { return seat; }
 }

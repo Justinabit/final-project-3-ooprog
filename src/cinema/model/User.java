@@ -1,5 +1,8 @@
 package cinema.model;
 
+import cinema.exception.ValidationException;
+import cinema.util.Validator;
+
 // [Member A] Abstract parent class for Admin and Customer (INHERITANCE + ABSTRACTION)
 public abstract class User {
     // private fields = ENCAPSULATION
@@ -9,17 +12,48 @@ public abstract class User {
     private String password;
     private boolean active = true;   // admin can deactivate a customer
 
-    public User(String userId, String name, String email, String password) {
+    // The constructor validates too, so an invalid User can never be created.
+    public User(String userId, String name, String email, String password) throws ValidationException {
+        Validator.validateName(name);
+        Validator.validateEmail(email);
+        Validator.validatePassword(password);
         this.userId = userId;
-        this.name = name;
-        this.email = email;
+        this.name = name.trim();
+        this.email = email.trim();
         this.password = password;
     }
 
     // Each subclass says what role it is (POLYMORPHISM)
     public abstract String getRole();
 
-    // TODO (A): add getters and setters for every field above
-    // TODO (A): setters should call Validator before changing anything
-    // TODO (A): add checkPassword(String input) that returns true if it matches
+    public String getUserId() { return userId; }
+
+    public String getName() { return name; }
+
+    public void setName(String name) throws ValidationException {
+        Validator.validateName(name);
+        this.name = name.trim();
+    }
+
+    public String getEmail() { return email; }
+
+    public void setEmail(String email) throws ValidationException {
+        Validator.validateEmail(email);
+        this.email = email.trim();
+    }
+
+    public String getPassword() { return password; }
+
+    public void setPassword(String password) throws ValidationException {
+        Validator.validatePassword(password);
+        this.password = password;
+    }
+
+    public boolean isActive() { return active; }
+
+    public void setActive(boolean active) { this.active = active; }
+
+    public boolean checkPassword(String input) {
+        return password.equals(input);
+    }
 }

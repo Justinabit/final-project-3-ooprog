@@ -13,10 +13,19 @@ public class CinemaRoom {
         this.roomName = roomName;
     }
 
+    // Creates seats A1, A2... B1, B2... The last row is VIP (only when there is more than one row).
     public void generateSeats(int rows, int seatsPerRow) {
-        // TODO (A): create seats named A1, A2... B1, B2... and add them to the list
-        //           (make the last row VIP if you want)
+        seats.clear();
+        for (int r = 0; r < rows; r++) {
+            char rowLetter = (char) ('A' + r);
+            boolean isVip = rows > 1 && r == rows - 1;
+            for (int s = 1; s <= seatsPerRow; s++) {
+                seats.add(new Seat(rowLetter + String.valueOf(s), isVip));
+            }
+        }
     }
 
-    // TODO (A): getters (getRoomId, getRoomName, getSeats)
+    public String getRoomId() { return roomId; }
+    public String getRoomName() { return roomName; }
+    public ArrayList<Seat> getSeats() { return seats; }
 }
