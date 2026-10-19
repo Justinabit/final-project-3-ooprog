@@ -1,4 +1,5 @@
 # Cinema Booking System
+# Cinema Booking System (Skeleton)
 
 ## How to run
 ```
