@@ -9,7 +9,8 @@ public class Main {
     static AccountMenu accountMenu = new AccountMenu(userManager);                 // A
     static VenueMenu venueMenu = new VenueMenu(venueManager);                      // A
     static MovieMenu movieMenu = new MovieMenu(movieManager, venueManager);       // B
-    static BookingMenu bookingMenu = new BookingMenu(movieManager);               // C
+    static PromoManager promoManager = new PromoManager();                         // C
+    static BookingMenu bookingMenu = new BookingMenu(movieManager, venueManager, promoManager); // C
     static ReportService reportService = new ReportService();                      // D
 
     public static void main(String[] args) {
@@ -19,10 +20,43 @@ public class Main {
     }
 
     // [D] Fill the system with starter data so we can test without typing everything.
+    // Showtimes are created relative to today so they are always in the future.
     static void loadSampleData() {
-        // TODO (D): create a default admin account  (use Admin class from A)
-        // TODO (D): create 1-2 branches with rooms and seats (A's classes)
-        // TODO (D): create a few movies and showtimes (B's classes)
+        try {
+            // Default admin and one sample customer
+            userManager.addUser(new Admin(userManager.nextUserId(), "System Admin", "admin@cinema.com", "Admin123"));
+            userManager.registerCustomer("Juan Dela Cruz", "juan@mail.com", "Customer1", 21);
+
+            // Branches, rooms and seats (last row of each room is VIP)
+            CinemaBranch sm = new CinemaBranch(venueManager.nextBranchId(), "SM Mall Branch", "SM City, Main Street");
+            CinemaBranch ayala = new CinemaBranch(venueManager.nextBranchId(), "Ayala Branch", "Ayala Center, Business District");
+            venueManager.addBranch(sm);
+            venueManager.addBranch(ayala);
+            CinemaRoom smRoom1 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 1", 5, 8);
+            CinemaRoom smRoom2 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 2", 4, 6);
+            CinemaRoom ayalaRoom1 = venueManager.addRoomToBranch(ayala.getBranchId(), "Cinema 1", 6, 10);
+
+            // Movies
+            Movie m1 = new Movie(movieManager.nextMovieId(), "Space Odyssey", "Sci-Fi", "PG", 130, "NOW SHOWING");
+            Movie m2 = new Movie(movieManager.nextMovieId(), "Midnight Terror", "Horror", "R-16", 105, "NOW SHOWING");
+            Movie m3 = new Movie(movieManager.nextMovieId(), "Laugh Out Loud", "Comedy", "G", 95, "NOW SHOWING");
+            Movie m4 = new Movie(movieManager.nextMovieId(), "Dark Streets", "Crime", "R-18", 120, "NOW SHOWING");
+            Movie m5 = new Movie(movieManager.nextMovieId(), "Summer Dreams", "Romance", "PG", 110, "COMING SOON");
+            for (Movie m : new Movie[] {m1, m2, m3, m4, m5}) movieManager.addMovie(m);
+
+            // Showtimes (tomorrow and the day after)
+            String d1 = java.time.LocalDate.now().plusDays(1).toString();
+            String d2 = java.time.LocalDate.now().plusDays(2).toString();
+            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m1, smRoom1, d1 + " 14:00", 250));
+            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m2, smRoom1, d1 + " 19:00", 280));
+            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m3, smRoom2, d1 + " 16:00", 200));
+            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m4, ayalaRoom1, d2 + " 20:00", 300));
+            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m1, ayalaRoom1, d2 + " 15:00", 270));
+
+            promoManager.addPromo("WELCOME10", 10);
+        } catch (CinemaException e) {
+            System.out.println("Could not load sample data: " + e.getMessage());
+        }
     }
 
     // ---------- MAIN MENU (not logged in) ----------

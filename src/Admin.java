@@ -1,6 +1,6 @@
 // [Member A] Admin account
 public class Admin extends User {
-    public Admin(String userId, String name, String email, String password) {
+    public Admin(String userId, String name, String email, String password) throws ValidationException {
         super(userId, name, email, password);
     }
 
