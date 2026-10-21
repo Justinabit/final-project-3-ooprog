@@ -8,7 +8,7 @@ public class RegularTicket extends Ticket {
 
     @Override
     public double calculatePrice() {
-        return showtime.getBasePrice() * seat.getPriceMultiplier();
+        return seat.getPrice(showtime.getBasePrice());
     }
 
     @Override

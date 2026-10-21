@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 import cinema.exception.BookingException;
 import cinema.exception.ValidationException;
+import cinema.util.Format;
 import cinema.util.Validator;
 
 // [Member B] A movie playing in a room at a certain time.
@@ -84,6 +85,6 @@ public class Showtime {
 
     public String describe(String branchName) {
         return showtimeId + " | " + movie.getTitle() + " | " + (branchName == null ? "" : branchName + " - ")
-                + room.getRoomName() + " | " + getDateTime() + " | " + String.format("$%.2f", basePrice);
+                + room.getRoomName() + " | " + Format.shortDateTime(start) + " | " + Format.peso(basePrice);
     }
 }

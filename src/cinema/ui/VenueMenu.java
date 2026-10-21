@@ -11,9 +11,11 @@ import cinema.model.CinemaBranch;
 import cinema.model.CinemaRoom;
 import cinema.model.Seat;
 import cinema.model.Showtime;
+import cinema.model.VipSeat;
 import cinema.service.MovieManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
 // [Member A] Admin menu for branches, rooms and seats
 public class VenueMenu {
@@ -218,7 +220,7 @@ public class VenueMenu {
             return;
         }
         Screen.option(1, "Standard seat");
-        Screen.option(2, "VIP seat (" + Seat.VIP_MULTIPLIER + "x price)");
+        Screen.option(2, "VIP seat (+" + Format.peso(VipSeat.EXTRA_CHARGE) + ")");
         int choice = Screen.readChoice();
         if (choice != 1 && choice != 2) {
             Screen.error("Invalid choice.");
@@ -234,39 +236,11 @@ public class VenueMenu {
         }
     }
 
-    // [A1 ] = standard seat, [A1 ]* = VIP seat. Row A is nearest the screen.
     private void printSeatMap(CinemaRoom room) {
         Screen.section("SEAT MAP: " + room.getRoomName() + " (" + room.getRoomId() + ")");
-        if (room.getSeats().isEmpty()) {
-            Screen.info("This room has no seats.");
-            return;
-        }
         System.out.println("  Layout: " + room.getLayoutName() + "  |  " + room.getSeats().size()
-                + " seats, " + room.getVipSeatCount() + " VIP  |  * = VIP (" + Seat.VIP_MULTIPLIER + "x price)");
-        System.out.println();
-
-        String screen = "";
-        for (int i = 0; i < room.getSeatsPerRow(); i++) {
-            screen += "======";
-        }
-        System.out.println("  " + screen + "  <- SCREEN");
-
-        String line = "";
-        int seatsInLine = 0;
-        for (Seat seat : room.getSeats()) {
-            line += String.format("[%-3s]", seat.getSeatNumber());
-            if (seat.isVip()) {
-                line += "*";
-            } else {
-                line += " ";
-            }
-            seatsInLine++;
-            if (seatsInLine == room.getSeatsPerRow()) {
-                System.out.println("  " + line);
-                line = "";
-                seatsInLine = 0;
-            }
-        }
+                + " seats, " + room.getVipSeatCount() + " VIP");
+        SeatMap.print(room, null);
     }
 
     // ---------- helpers ----------

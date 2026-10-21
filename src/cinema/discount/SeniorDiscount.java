@@ -1,6 +1,6 @@
 package cinema.discount;
 
-// [Member C] 20% off for customers aged 60 and above
+// [Member C] 20% off for senior citizens (aged 60 and above)
 public class SeniorDiscount implements DiscountStrategy {
     public static final int MIN_AGE = 60;
 
