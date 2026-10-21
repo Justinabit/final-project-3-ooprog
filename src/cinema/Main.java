@@ -30,7 +30,7 @@ public class Main {
     static VenueManager venueManager = new VenueManager();      // A
     static MovieManager movieManager = new MovieManager();      // B
     static AccountMenu accountMenu = new AccountMenu(userManager);                 // A
-    static VenueMenu venueMenu = new VenueMenu(venueManager);                      // A
+    static VenueMenu venueMenu = new VenueMenu(venueManager, movieManager);        // A
     static MovieMenu movieMenu = new MovieMenu(movieManager, venueManager);       // B
     static PromoManager promoManager = new PromoManager();                         // C
     static BookingMenu bookingMenu = new BookingMenu(movieManager, venueManager, promoManager); // C
