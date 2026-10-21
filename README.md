@@ -1,4 +1,4 @@
-# CURATOR - Cinema Management System
+# CURATOR - Cinema Booking System
 
 ## Project structure
 ```
