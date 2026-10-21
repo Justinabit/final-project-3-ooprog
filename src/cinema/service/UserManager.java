@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import cinema.exception.LoginException;
 import cinema.exception.ValidationException;
+import cinema.model.Admin;
 import cinema.model.Customer;
 import cinema.model.User;
 import cinema.util.Validator;
@@ -21,6 +22,12 @@ public class UserManager {
         addUser(customer);
     }
 
+    // An admin creates another admin account
+    public void registerAdmin(String name, String email, String password) throws ValidationException {
+        Admin admin = new Admin(nextUserId(), name, email, password);
+        addUser(admin);
+    }
+
     // Used for registration and for adding the default admin
     public void addUser(User user) throws ValidationException {
         if (isEmailTaken(user.getEmail(), null)) {
@@ -36,12 +43,18 @@ public class UserManager {
         return false;
     }
 
-    // Edit email while keeping emails unique
-    public void changeEmail(User user, String newEmail) throws ValidationException {
-        Validator.validateEmail(newEmail);
-        if (isEmailTaken(newEmail, user)) {
+    // Checks the email format and that no other account uses it.
+    // owner = the account being edited (its own email is allowed), or null for a new account.
+    public void checkNewEmail(String email, User owner) throws ValidationException {
+        Validator.validateEmail(email);
+        if (isEmailTaken(email, owner)) {
             throw new ValidationException("That email is already registered.");
         }
+    }
+
+    // Edit email while keeping emails unique
+    public void changeEmail(User user, String newEmail) throws ValidationException {
+        checkNewEmail(newEmail, user);
         user.setEmail(newEmail);
     }
 

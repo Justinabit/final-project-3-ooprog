@@ -25,4 +25,10 @@ public class Customer extends User {
     }
 
     public String getCustomerId() { return getUserId(); }
+
+    // Same row as every User, plus the age at the end (POLYMORPHISM: overrides User.getDetails)
+    @Override
+    public String getDetails() {
+        return super.getDetails() + age;
+    }
 }

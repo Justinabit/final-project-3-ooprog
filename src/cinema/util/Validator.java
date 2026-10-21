@@ -63,6 +63,20 @@ public class Validator {
         }
     }
 
+    public static void validateBranchName(String name) throws ValidationException {
+        validateRequired("Branch name", name);
+        if (name.trim().length() > 40) {
+            throw new ValidationException("Branch name must be 40 characters or less.");
+        }
+    }
+
+    public static void validateLocation(String location) throws ValidationException {
+        validateRequired("Location", location);
+        if (location.trim().length() > 60) {
+            throw new ValidationException("Location must be 60 characters or less.");
+        }
+    }
+
     public static void validateRoomName(String name) throws ValidationException {
         validateRequired("Room name", name);
         if (name.trim().length() > 30) {

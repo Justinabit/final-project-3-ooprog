@@ -12,15 +12,15 @@ public class CashPayment implements PaymentStrategy {
         if (tendered < amount) {
             throw new PaymentException(String.format("Insufficient cash. Required: $%.2f, provided: $%.2f", amount, tendered));
         }
-        System.out.println(String.format("Paid $%.2f in cash.", amount));
+        System.out.println(String.format("  Paid $%.2f in cash.", amount));
         double change = tendered - amount;
         if (change > 0.004) {
-            System.out.println(String.format("Change returned: $%.2f", change));
+            System.out.println(String.format("  Change returned: $%.2f", change));
         }
     }
 
     @Override
     public void refund(double amount) {
-        System.out.println(String.format("Refund of $%.2f in cash is available at the counter.", amount));
+        System.out.println(String.format("  Refund of $%.2f in cash is available at the counter.", amount));
     }
 }
