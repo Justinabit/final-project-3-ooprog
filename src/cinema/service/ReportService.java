@@ -6,12 +6,13 @@ import java.util.Map;
 
 import cinema.model.Booking;
 import cinema.model.Showtime;
+import cinema.ui.Screen;
 
 // [Member D] Reports for the admin. Read data from BookingManager.getInstance()
 public class ReportService {
 
     public void showRevenueReport() {
-        System.out.println("\n--- REVENUE REPORT ---");
+        Screen.title("REVENUE REPORT");
         ArrayList<Booking> bookings = BookingManager.getInstance().getAllBookings();
         double totalRevenue = 0.0;
         int confirmed = 0, cancelled = 0;
@@ -27,11 +28,11 @@ public class ReportService {
             }
         }
 
-        System.out.println("Confirmed bookings: " + confirmed);
-        System.out.println("Cancelled bookings: " + cancelled);
-        System.out.printf("Total revenue: $%.2f%n", totalRevenue);
+        System.out.println("  Confirmed bookings: " + confirmed);
+        System.out.println("  Cancelled bookings: " + cancelled);
+        System.out.printf("  Total revenue: $%.2f%n", totalRevenue);
         if (!byMovie.isEmpty()) {
-            System.out.println("Revenue by movie:");
+            Screen.section("REVENUE BY MOVIE");
             for (Map.Entry<String, Double> e : byMovie.entrySet()) {
                 System.out.printf("  %-30s $%.2f%n", e.getKey(), e.getValue());
             }
@@ -39,7 +40,7 @@ public class ReportService {
     }
 
     public void showAttendanceReport() {
-        System.out.println("\n--- ATTENDANCE REPORT ---");
+        Screen.title("ATTENDANCE REPORT");
         ArrayList<Booking> bookings = BookingManager.getInstance().getAllBookings();
         int totalTicketsSold = 0;
         Map<Showtime, Integer> perShowtime = new LinkedHashMap<>();
@@ -52,9 +53,9 @@ public class ReportService {
             }
         }
 
-        System.out.println("Total tickets sold (confirmed): " + totalTicketsSold);
+        System.out.println("  Total tickets sold (confirmed): " + totalTicketsSold);
         if (!perShowtime.isEmpty()) {
-            System.out.println("Per showtime:");
+            Screen.section("PER SHOWTIME");
             for (Map.Entry<Showtime, Integer> e : perShowtime.entrySet()) {
                 Showtime s = e.getKey();
                 System.out.printf("  %s | %s | %s | %d/%d seats (%.0f%%)%n", s.getShowtimeId(), s.getMovie().getTitle(),

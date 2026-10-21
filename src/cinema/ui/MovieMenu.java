@@ -27,13 +27,13 @@ public class MovieMenu {
     public void browseMovies() {
         boolean back = false;
         while (!back) {
-            System.out.println("\n--- BROWSE MOVIES ---");
-            System.out.println("1. All movies");
-            System.out.println("2. Filter by genre");
-            System.out.println("3. Filter by status (NOW SHOWING / COMING SOON)");
-            System.out.println("4. View showtimes for a movie");
-            System.out.println("0. Back");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("BROWSE MOVIES");
+            Screen.option(1, "All movies");
+            Screen.option(2, "Filter by genre");
+            Screen.option(3, "Filter by status (NOW SHOWING / COMING SOON)");
+            Screen.option(4, "View showtimes for a movie");
+            Screen.option(0, "Back");
+            int choice = Screen.readChoice();
             switch (choice) {
                 case 1:
                     printMovies(movieManager.getMovies());
@@ -51,7 +51,7 @@ public class MovieMenu {
                     String status = ConsoleReader.readLine("Status (1 = NOW SHOWING, 2 = COMING SOON): ");
                     String wanted = status.equals("1") ? "NOW SHOWING" : status.equals("2") ? "COMING SOON" : null;
                     if (wanted == null) {
-                        System.out.println("Please enter 1 or 2.");
+                        Screen.error("Please enter 1 or 2.");
                         break;
                     }
                     ArrayList<Movie> result = new ArrayList<>();
@@ -64,14 +64,14 @@ public class MovieMenu {
                 case 4: {
                     Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID: "));
                     if (m == null) {
-                        System.out.println("Movie not found.");
+                        Screen.error("Movie not found.");
                     } else {
                         printShowtimes(movieManager.getUpcomingShowtimes(m));
                     }
                     break;
                 }
                 case 0: back = true; break;
-                default: System.out.println("Invalid choice. Try again.");
+                default: Screen.error("Invalid choice. Try again.");
             }
         }
     }
@@ -80,20 +80,20 @@ public class MovieMenu {
     public void manageMovies() {
         boolean back = false;
         while (!back) {
-            System.out.println("\n--- MANAGE MOVIES (ADMIN) ---");
-            System.out.println("1. Add movie");
-            System.out.println("2. Edit movie");
-            System.out.println("3. Remove movie");
-            System.out.println("4. List movies");
-            System.out.println("0. Back");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("MANAGE MOVIES (ADMIN)");
+            Screen.option(1, "Add movie");
+            Screen.option(2, "Edit movie");
+            Screen.option(3, "Remove movie");
+            Screen.option(4, "List movies");
+            Screen.option(0, "Back");
+            int choice = Screen.readChoice();
             switch (choice) {
                 case 1: addMovie(); break;
                 case 2: editMovie(); break;
                 case 3: removeMovie(); break;
                 case 4: printMovies(movieManager.getMovies()); break;
                 case 0: back = true; break;
-                default: System.out.println("Invalid choice. Try again.");
+                default: Screen.error("Invalid choice. Try again.");
             }
         }
     }
@@ -107,9 +107,9 @@ public class MovieMenu {
         try {
             Movie movie = new Movie(movieManager.nextMovieId(), title, genre, rating, duration, status);
             movieManager.addMovie(movie);
-            System.out.println("Movie added with ID " + movie.getMovieId() + ".");
+            Screen.success("Movie added with ID " + movie.getMovieId() + ".");
         } catch (ValidationException e) {
-            System.out.println("Error: " + e.getMessage());
+            Screen.error(e.getMessage());
         }
     }
 
@@ -121,11 +121,11 @@ public class MovieMenu {
     private void editMovie() {
         Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID to edit: "));
         if (m == null) {
-            System.out.println("Movie not found.");
+            Screen.error("Movie not found.");
             return;
         }
-        System.out.println(m);
-        System.out.println("1. Title  2. Genre  3. Age rating  4. Duration  5. Status  0. Cancel");
+        System.out.println("  " + m);
+        System.out.println("   [1] Title  [2] Genre  [3] Age rating  [4] Duration  [5] Status  [0] Cancel");
         int field = ConsoleReader.readInt("Edit which field? ");
         try {
             switch (field) {
@@ -135,11 +135,11 @@ public class MovieMenu {
                 case 4: m.setDurationMinutes(ConsoleReader.readInt("New duration in minutes: ")); break;
                 case 5: m.setStatus(readStatus()); break;
                 case 0: return;
-                default: System.out.println("Invalid choice."); return;
+                default: Screen.error("Invalid choice."); return;
             }
-            System.out.println("Updated: " + m);
+            Screen.success("Updated: " + m);
         } catch (ValidationException e) {
-            System.out.println("Error: " + e.getMessage());
+            Screen.error(e.getMessage());
         }
     }
 
@@ -147,18 +147,18 @@ public class MovieMenu {
         String id = ConsoleReader.readLine("Movie ID to remove: ");
         Movie m = movieManager.findMovie(id);
         if (m == null) {
-            System.out.println("Movie not found.");
+            Screen.error("Movie not found.");
             return;
         }
         if (!ConsoleReader.readYesNo("Remove '" + m.getTitle() + "' and its showtimes? (y/n): ")) {
-            System.out.println("Cancelled.");
+            Screen.info("Cancelled.");
             return;
         }
         try {
             movieManager.removeMovie(id);
-            System.out.println("Movie removed.");
+            Screen.success("Movie removed.");
         } catch (BookingException e) {
-            System.out.println("Error: " + e.getMessage());
+            Screen.error(e.getMessage());
         }
     }
 
@@ -166,16 +166,16 @@ public class MovieMenu {
     public void manageShowtimes() {
         boolean back = false;
         while (!back) {
-            System.out.println("\n--- MANAGE SHOWTIMES (ADMIN) ---");
-            System.out.println("1. Add showtime");
-            System.out.println("2. View upcoming showtimes");
-            System.out.println("0. Back");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("MANAGE SHOWTIMES (ADMIN)");
+            Screen.option(1, "Add showtime");
+            Screen.option(2, "View upcoming showtimes");
+            Screen.option(0, "Back");
+            int choice = Screen.readChoice();
             switch (choice) {
                 case 1: addShowtime(); break;
                 case 2: printShowtimes(movieManager.getUpcomingShowtimes(null)); break;
                 case 0: back = true; break;
-                default: System.out.println("Invalid choice. Try again.");
+                default: Screen.error("Invalid choice. Try again.");
             }
         }
     }
@@ -186,13 +186,13 @@ public class MovieMenu {
             if ("NOW SHOWING".equals(m.getStatus())) showing.add(m);
         }
         if (showing.isEmpty()) {
-            System.out.println("No NOW SHOWING movies. Add one first.");
+            Screen.error("No NOW SHOWING movies. Add one first.");
             return;
         }
         printMovies(showing);
         Movie movie = movieManager.findMovie(ConsoleReader.readLine("Movie ID: "));
         if (movie == null || !showing.contains(movie)) {
-            System.out.println("Please choose one of the NOW SHOWING movies listed.");
+            Screen.error("Please choose one of the NOW SHOWING movies listed.");
             return;
         }
 
@@ -205,16 +205,16 @@ public class MovieMenu {
             }
         }
         if (!anyRoom) {
-            System.out.println("No rooms exist yet. Add a branch and room first.");
+            Screen.error("No rooms exist yet. Add a branch and room first.");
             return;
         }
         CinemaRoom room = venueManager.findRoom(ConsoleReader.readLine("Room ID: "));
         if (room == null) {
-            System.out.println("Room not found.");
+            Screen.error("Room not found.");
             return;
         }
         if (room.getSeats().isEmpty()) {
-            System.out.println("That room has no seats.");
+            Screen.error("That room has no seats.");
             return;
         }
         String dateTime = ConsoleReader.readLine("Date and time (yyyy-MM-dd HH:mm): ");
@@ -222,28 +222,28 @@ public class MovieMenu {
         try {
             Showtime s = new Showtime(movieManager.nextShowtimeId(), movie, room, dateTime, price);
             movieManager.addShowtime(s);
-            System.out.println("Showtime added with ID " + s.getShowtimeId() + ".");
+            Screen.success("Showtime added with ID " + s.getShowtimeId() + ".");
         } catch (CinemaException e) {   // ValidationException or BookingException
-            System.out.println("Error: " + e.getMessage());
+            Screen.error(e.getMessage());
         }
     }
 
     private void printMovies(ArrayList<Movie> list) {
         if (list.isEmpty()) {
-            System.out.println("No movies found.");
+            Screen.info("No movies found.");
             return;
         }
-        for (Movie m : list) System.out.println(m);
+        for (Movie m : list) System.out.println("  " + m);
     }
 
     private void printShowtimes(ArrayList<Showtime> list) {
         if (list.isEmpty()) {
-            System.out.println("No upcoming showtimes.");
+            Screen.info("No upcoming showtimes.");
             return;
         }
         for (Showtime s : list) {
             CinemaBranch b = venueManager.findBranchOfRoom(s.getRoom());
-            System.out.println(s.describe(b == null ? null : b.getBranchName())
+            System.out.println("  " + s.describe(b == null ? null : b.getBranchName())
                     + " | " + s.getAvailableSeats().size() + "/" + s.getCapacity() + " seats free");
         }
     }

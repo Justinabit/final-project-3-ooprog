@@ -18,8 +18,8 @@ import cinema.service.VenueManager;
 import cinema.ui.AccountMenu;
 import cinema.ui.BookingMenu;
 import cinema.ui.MovieMenu;
+import cinema.ui.Screen;
 import cinema.ui.VenueMenu;
-import cinema.util.ConsoleReader;
 
 // Entry point. Shows the menus and sends each choice to the right class.
 // Tags in comments tell you who owns what:  [A] accounts/venues  [B] movies  [C] booking  [D] payments/reports
@@ -38,8 +38,9 @@ public class Main {
 
     public static void main(String[] args) {
         loadSampleData();
+        Screen.showWelcome();
         mainMenu();
-        System.out.println("Thank you for using the Cinema System. Goodbye!");
+        Screen.showGoodbye();
     }
 
     // [D] Fill the system with starter data so we can test without typing everything.
@@ -78,7 +79,7 @@ public class Main {
 
             promoManager.addPromo("WELCOME10", 10);
         } catch (CinemaException e) {
-            System.out.println("Could not load sample data: " + e.getMessage());
+            Screen.error("Could not load sample data: " + e.getMessage());
         }
     }
 
@@ -86,12 +87,12 @@ public class Main {
     static void mainMenu() {
         boolean running = true;
         while (running) {
-            System.out.println("\n===== CINEMA BOOKING SYSTEM =====");
-            System.out.println("1. Register");
-            System.out.println("2. Customer Login");
-            System.out.println("3. Admin Login");
-            System.out.println("0. Exit");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("MAIN MENU");
+            Screen.option(1, "Register");
+            Screen.option(2, "Customer Login");
+            Screen.option(3, "Admin Login");
+            Screen.option(0, "Exit");
+            int choice = Screen.readChoice();
 
             switch (choice) {
                 case 1:
@@ -113,7 +114,7 @@ public class Main {
                     running = false;
                     break;
                 default:
-                    System.out.println("Invalid choice. Try again.");
+                    Screen.error("Invalid choice. Try again.");
             }
         }
     }
@@ -122,13 +123,14 @@ public class Main {
     static void customerMenu(Customer customer) {
         boolean loggedIn = true;
         while (loggedIn) {
-            System.out.println("\n===== CUSTOMER MENU =====");
-            System.out.println("1. Browse Movies");
-            System.out.println("2. Book a Ticket");
-            System.out.println("3. My Bookings");
-            System.out.println("4. My Profile");
-            System.out.println("0. Logout");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("CUSTOMER MENU");
+            Screen.info("Logged in as " + customer.getName() + " (" + customer.getRole() + ")");
+            Screen.option(1, "Browse Movies");
+            Screen.option(2, "Book a Ticket");
+            Screen.option(3, "My Bookings");
+            Screen.option(4, "My Profile");
+            Screen.option(0, "Logout");
+            int choice = Screen.readChoice();
 
             switch (choice) {
                 case 1:
@@ -145,9 +147,10 @@ public class Main {
                     break;
                 case 0:
                     loggedIn = false;
+                    Screen.success("You have been logged out.");
                     break;
                 default:
-                    System.out.println("Invalid choice. Try again.");
+                    Screen.error("Invalid choice. Try again.");
             }
         }
     }
@@ -156,16 +159,17 @@ public class Main {
     static void adminMenu(Admin admin) {
         boolean loggedIn = true;
         while (loggedIn) {
-            System.out.println("\n===== ADMIN MENU =====");
-            System.out.println("1. Manage Customers");
-            System.out.println("2. Manage Venues (branches/rooms/seats)");
-            System.out.println("3. Manage Movies");
-            System.out.println("4. Manage Showtimes");
-            System.out.println("5. Manage Promo Codes");
-            System.out.println("6. Revenue Report");
-            System.out.println("7. Attendance Report");
-            System.out.println("0. Logout");
-            int choice = ConsoleReader.readInt("Choose: ");
+            Screen.title("ADMIN MENU");
+            Screen.info("Logged in as " + admin.getName() + " (" + admin.getRole() + ")");
+            Screen.option(1, "Manage Accounts");
+            Screen.option(2, "Manage Venues (branches / rooms / seats)");
+            Screen.option(3, "Manage Movies");
+            Screen.option(4, "Manage Showtimes");
+            Screen.option(5, "Manage Promo Codes");
+            Screen.option(6, "Revenue Report");
+            Screen.option(7, "Attendance Report");
+            Screen.option(0, "Logout");
+            int choice = Screen.readChoice();
 
             switch (choice) {
                 case 1:
@@ -191,9 +195,10 @@ public class Main {
                     break;
                 case 0:
                     loggedIn = false;
+                    Screen.success("You have been logged out.");
                     break;
                 default:
-                    System.out.println("Invalid choice. Try again.");
+                    Screen.error("Invalid choice. Try again.");
             }
         }
     }

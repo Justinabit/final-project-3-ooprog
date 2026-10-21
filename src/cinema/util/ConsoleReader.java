@@ -7,9 +7,9 @@ import java.util.Scanner;
 public class ConsoleReader {
     private static Scanner scanner = new Scanner(System.in);
 
-    // Reads a line of text
+    // Reads a line of text. Prompts are indented so they line up with the menus.
     public static String readLine(String prompt) {
-        System.out.print(prompt);
+        System.out.print("  " + prompt);
         try {
             return scanner.nextLine().trim();
         } catch (NoSuchElementException e) {   // input stream closed (Ctrl+D / end of piped input)
@@ -25,7 +25,7 @@ public class ConsoleReader {
             try {
                 return Integer.parseInt(readLine(prompt));
             } catch (NumberFormatException e) {
-                System.out.println("Please enter a number.");
+                System.out.println("  [ !! ] Please enter a number.");
             }
         }
     }
@@ -36,7 +36,7 @@ public class ConsoleReader {
             try {
                 return Double.parseDouble(readLine(prompt));
             } catch (NumberFormatException e) {
-                System.out.println("Please enter a valid number.");
+                System.out.println("  [ !! ] Please enter a valid number.");
             }
         }
     }
