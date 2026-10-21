@@ -64,7 +64,7 @@ public class Screen {
     // Smaller heading inside a screen, for example "SUMMARY"
     public static void section(String text) {
         System.out.println();
-        System.out.println(" --- " + text + " " + repeat("-", WIDTH - 6 - text.length()));
+        System.out.println(" --- " + text + " " + repeat("-", WIDTH - 5 - text.length()));
     }
 
     // One menu option, for example "   [1]  Register"

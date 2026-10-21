@@ -5,6 +5,9 @@ import cinema.util.Validator;
 
 // [Member A] Abstract parent class for Admin and Customer (INHERITANCE + ABSTRACTION)
 public abstract class User {
+    // Column layout for the accounts table (ID, NAME, EMAIL, ROLE, STATUS)
+    public static final String TABLE_FORMAT = "%-5s %-18s %-22s %-9s %-12s";
+
     // private fields = ENCAPSULATION
     private String userId;
     private String name;
@@ -55,5 +58,14 @@ public abstract class User {
 
     public boolean checkPassword(String input) {
         return password.equals(input);
+    }
+
+    // One row of the accounts table. Customer overrides this to add the age (POLYMORPHISM).
+    public String getDetails() {
+        String status = "ACTIVE";
+        if (!active) {
+            status = "DEACTIVATED";
+        }
+        return String.format(TABLE_FORMAT, userId, name, email, getRole(), status);
     }
 }

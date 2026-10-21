@@ -173,7 +173,7 @@ public class Main {
 
             switch (choice) {
                 case 1:
-                    accountMenu.manageCustomers();                   // [A]
+                    accountMenu.manageAccounts();                    // [A]
                     break;
                 case 2:
                     venueMenu.show();                                // [A]
