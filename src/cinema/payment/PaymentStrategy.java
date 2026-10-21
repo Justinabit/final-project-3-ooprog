@@ -9,6 +9,6 @@ public interface PaymentStrategy {
 
     // Money goes back the same way it came in. Subclasses can override the message.
     default void refund(double amount) {
-        System.out.println(String.format("Refunded $%.2f via %s.", amount, getDisplayName()));
+        System.out.println(String.format("  Refunded $%.2f via %s.", amount, getDisplayName()));
     }
 }
