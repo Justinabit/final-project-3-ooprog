@@ -5,10 +5,13 @@ import cinema.util.Validator;
 
 // [Member B] A movie in the catalog
 public class Movie {
+    // Column layout for movie tables (ID, TITLE, GENRE, RATING, RUNTIME, STATUS)
+    public static final String TABLE_FORMAT = "%-5s %-28s %-9s %-5s %-7s %s";
+
     private String movieId;
     private String title;
     private String genre;
-    private String ageRating;    // "G", "PG", "R-16", "R-18"
+    private String ageRating;    // MTRCB rating: "G", "PG", "R-13", "R-16", "R-18"
     private int durationMinutes;
     private String status;       // "NOW SHOWING" or "COMING SOON"
 
@@ -61,13 +64,24 @@ public class Movie {
         switch (ageRating) {
             case "R-18": return 18;
             case "R-16": return 16;
+            case "R-13": return 13;
             default: return 0;
         }
     }
 
+    // 140 -> "2h 20m", 125 -> "2h 05m"
+    public String getRuntime() {
+        int hours = durationMinutes / 60;
+        int minutes = durationMinutes % 60;
+        return String.format("%dh %02dm", hours, minutes);
+    }
+
     @Override
     public String toString() {
-        return movieId + " | " + title + " | " + genre + " | " + ageRating + " | "
-                + durationMinutes + " min | " + status;
+        String shownTitle = title;
+        if (shownTitle.length() > 28) {
+            shownTitle = shownTitle.substring(0, 25) + "...";   // keep the table columns lined up
+        }
+        return String.format(TABLE_FORMAT, movieId, shownTitle, genre, ageRating, getRuntime(), status);
     }
 }

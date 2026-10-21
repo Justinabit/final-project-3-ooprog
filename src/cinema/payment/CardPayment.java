@@ -2,6 +2,7 @@ package cinema.payment;
 
 import cinema.exception.PaymentException;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
 // [Member D] Pay with credit/debit card
 public class CardPayment implements PaymentStrategy {
@@ -13,11 +14,11 @@ public class CardPayment implements PaymentStrategy {
         if (!cardNumber.matches("\\d{16}")) {
             throw new PaymentException("Invalid card number. It must contain exactly 16 digits.");
         }
-        System.out.println(String.format("  Paid $%.2f by card ending in %s.", amount, cardNumber.substring(12)));
+        System.out.println("  Paid " + Format.peso(amount) + " by card ending in " + cardNumber.substring(12) + ".");
     }
 
     @Override
     public void refund(double amount) {
-        System.out.println(String.format("  Refunded $%.2f to the original card.", amount));
+        System.out.println("  Refunded " + Format.peso(amount) + " to the original card (3-5 banking days).");
     }
 }

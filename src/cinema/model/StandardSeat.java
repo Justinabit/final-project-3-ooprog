@@ -12,7 +12,7 @@ public class StandardSeat extends Seat {
     }
 
     @Override
-    public double getPriceMultiplier() {
-        return 1.0;
+    public double getExtraCharge() {
+        return 0;
     }
 }

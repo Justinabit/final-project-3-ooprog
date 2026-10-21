@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import cinema.discount.DiscountStrategy;
 import cinema.discount.NoDiscount;
 import cinema.discount.PromoDiscount;
+import cinema.discount.PwdDiscount;
 import cinema.discount.SeniorDiscount;
 import cinema.exception.BookingException;
 import cinema.exception.PaymentException;
@@ -12,6 +13,7 @@ import cinema.exception.ValidationException;
 import cinema.model.Booking;
 import cinema.model.CinemaBranch;
 import cinema.model.Customer;
+import cinema.model.Movie;
 import cinema.model.Promo;
 import cinema.model.RegularTicket;
 import cinema.model.Seat;
@@ -20,14 +22,17 @@ import cinema.model.StudentTicket;
 import cinema.model.Ticket;
 import cinema.payment.CardPayment;
 import cinema.payment.CashPayment;
+import cinema.payment.EWalletPayment;
 import cinema.payment.PaymentStrategy;
 import cinema.service.BookingManager;
 import cinema.service.MovieManager;
 import cinema.service.PromoManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
-// [Member C] Customer booking flow + admin promo/booking handling
+// [Member C] Customer booking flow + admin promo handling.
+// Booking works like a real cinema app: movie -> schedule -> seats -> tickets -> pay -> e-ticket.
 public class BookingMenu {
     private static final int MAX_SEATS_PER_BOOKING = 8;
     private static final int MAX_PAYMENT_ATTEMPTS = 3;
@@ -42,130 +47,144 @@ public class BookingMenu {
         this.promoManager = promoManager;
     }
 
-    // Customer: full booking process
+    // ---------- customer: book a ticket ----------
+
     public void bookTicket(Customer customer) {
         Screen.title("BOOK A TICKET");
 
-        // 1. choose a showtime
-        ArrayList<Showtime> options = new ArrayList<>();
-        for (Showtime s : movieManager.getUpcomingShowtimes(null)) {
-            if ("NOW SHOWING".equals(s.getMovie().getStatus())) options.add(s);
-        }
-        if (options.isEmpty()) {
-            Screen.info("There are no upcoming showtimes right now.");
-            return;
-        }
-        for (Showtime s : options) {
-            CinemaBranch b = venueManager.findBranchOfRoom(s.getRoom());
-            System.out.println("  " + s.describe(b == null ? null : b.getBranchName()) + " | " + s.getMovie().getAgeRating()
-                    + " | " + s.getAvailableSeats().size() + " seats free");
-        }
-        Showtime showtime = movieManager.findShowtime(ConsoleReader.readLine("Showtime ID (or blank to cancel): "));
-        if (showtime == null || !options.contains(showtime)) {
-            Screen.info("Booking cancelled (no valid showtime chosen).");
-            return;
-        }
-        if (customer.getAge() < showtime.getMovie().getMinimumAge()) {
-            Screen.error("Sorry, " + showtime.getMovie().getAgeRating() + " movies require age "
-                    + showtime.getMovie().getMinimumAge() + "+.");
+        // STEP 1: movie
+        Movie movie = chooseMovie();
+        if (movie == null) return;
+        if (customer.getAge() < movie.getMinimumAge()) {
+            Screen.error("Sorry, " + movie.getTitle() + " is rated " + movie.getAgeRating()
+                    + ". You must be at least " + movie.getMinimumAge() + " years old to watch it.");
             return;
         }
 
-        // 2. show seat map, choose seats
-        showSeatMap(showtime);
+        // STEP 2: schedule
+        Showtime showtime = chooseShowtime(movie);
+        if (showtime == null) return;
+
+        // STEP 3: seats
+        Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
+        System.out.println("  " + movie.getTitle() + "  |  " + cinemaName(showtime) + "  |  "
+                + Format.dateTime(showtime.getStart()));
+        SeatMap.print(showtime.getRoom(), showtime);
         ArrayList<Seat> seats = chooseSeats(showtime);
         if (seats == null) return;
 
-        // 3. choose ticket type
-        Screen.section("TICKET TYPE");
-        Screen.option(1, "Regular");
-        Screen.option(2, "Student (20% off)");
-        boolean student = Screen.readChoice() == 2;
-        if (student) Screen.info("Note: " + new StudentTicket(showtime, seats.get(0)).getEligibilityNote());
+        // STEP 4: ticket type and discount
+        Screen.section("STEP 4 OF 5: TICKET TYPE AND DISCOUNT");
+        boolean student = chooseStudentTicket();
         ArrayList<Ticket> tickets = new ArrayList<>();
         for (Seat seat : seats) {
-            tickets.add(student ? new StudentTicket(showtime, seat) : new RegularTicket(showtime, seat));
+            if (student) {
+                tickets.add(new StudentTicket(showtime, seat));
+            } else {
+                tickets.add(new RegularTicket(showtime, seat));
+            }
         }
-
-        // 4. apply discount
+        if (student) {
+            Screen.info("Note: " + tickets.get(0).getEligibilityNote());
+        }
         DiscountStrategy discount = chooseDiscount(customer);
 
-        // 5. choose payment method
-        double total = BookingManager.calculateTotal(tickets, discount);
-        Screen.section("SUMMARY");
-        System.out.println("  " + showtime.getMovie().getTitle() + " | " + showtime.getDateTime() + " | " + showtime.getRoom().getRoomName());
-        for (Ticket t : tickets) {
-            System.out.println("    " + t.getSeat() + "  " + t.getTicketType() + "  " + String.format("$%.2f", t.calculatePrice()));
-        }
-        System.out.println("  Discount: " + discount.getName());
-        System.out.println(String.format("  TOTAL: $%.2f", total));
-
-        Screen.section("PAYMENT METHOD");
-        Screen.option(1, "Cash");
-        Screen.option(2, "Credit/Debit Card");
-        PaymentStrategy payment;
-        int pm = Screen.readChoice();
-        if (pm == 1) payment = new CashPayment();
-        else if (pm == 2) payment = new CardPayment();
-        else {
-            Screen.error("Invalid payment method. Booking cancelled.");
-            return;
-        }
-        if (!ConsoleReader.readYesNo("Confirm and pay? (y/n): ")) {
-            Screen.info("Booking cancelled.");
+        // STEP 5: review and pay
+        Screen.section("STEP 5 OF 5: REVIEW AND PAY");
+        double total = printOrderSummary(showtime, tickets, discount);
+        PaymentStrategy payment = choosePayment();
+        if (payment == null) return;
+        if (!ConsoleReader.readYesNo("Confirm and pay " + Format.peso(total) + " with " + payment.getDisplayName() + "? (y/n): ")) {
+            Screen.info("Booking cancelled. Nothing was charged.");
             return;
         }
 
-        // 6. confirm: hold seats first, then take payment; release seats if payment fails
-        Booking booking = null;
+        // Hold the seats first, then take the payment. If payment fails, release the seats.
         try {
-            booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, discount);
-            boolean paid = false;
-            for (int attempt = 1; attempt <= MAX_PAYMENT_ATTEMPTS && !paid; attempt++) {
-                try {
-                    payment.pay(booking.getTotalPrice());
-                    paid = true;
-                } catch (PaymentException e) {
-                    Screen.error("Payment failed: " + e.getMessage());
-                    if (attempt < MAX_PAYMENT_ATTEMPTS) Screen.info("Try again (" + attempt + "/" + MAX_PAYMENT_ATTEMPTS + ").");
-                }
-            }
-            if (!paid) {
+            Booking booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, discount);
+            booking.setTicketType(tickets.get(0).getTicketType());
+            if (!takePayment(payment, booking.getTotalPrice())) {
                 BookingManager.getInstance().discardBooking(booking);
                 Screen.info("Booking cancelled; your seats were released.");
                 return;
             }
             booking.setPayment(payment);
-            Screen.success("Booking confirmed!");
-            System.out.println("  " + booking);
+            Screen.success("Payment successful! Your booking is confirmed.");
+            printETicket(booking);
         } catch (BookingException e) {
             Screen.error("Booking failed: " + e.getMessage());
         }
     }
 
-    private void showSeatMap(Showtime showtime) {
-        Screen.section("SEAT MAP");
-        System.out.println("  [ ] free, [XX] taken, * = VIP    SCREEN THIS WAY");
-        String currentRow = "";
-        StringBuilder line = new StringBuilder();
-        for (Seat seat : showtime.getRoom().getSeats()) {
-            String row = seat.getSeatNumber().substring(0, 1);
-            if (!row.equals(currentRow)) {
-                if (line.length() > 0) System.out.println("  " + line);
-                line = new StringBuilder();
-                currentRow = row;
+    // STEP 1: only NOW SHOWING movies that still have upcoming schedules
+    private Movie chooseMovie() {
+        ArrayList<Movie> movies = new ArrayList<>();
+        for (Movie m : movieManager.getMovies()) {
+            if ("NOW SHOWING".equals(m.getStatus()) && !movieManager.getUpcomingShowtimes(m).isEmpty()) {
+                movies.add(m);
             }
-            String cell = showtime.isSeatTaken(seat.getSeatNumber()) ? "XX" : seat.getSeatNumber();
-            line.append(String.format("[%-3s]", cell)).append(seat.getSeatType().equals("VIP") ? "*" : " ");
         }
-        if (line.length() > 0) System.out.println("  " + line);
-        System.out.println(String.format("  Standard: $%.2f   VIP: $%.2f", showtime.getBasePrice(),
-                showtime.getBasePrice() * Seat.VIP_MULTIPLIER));
+        if (movies.isEmpty()) {
+            Screen.info("There are no upcoming showtimes right now.");
+            return null;
+        }
+        Screen.section("STEP 1 OF 5: CHOOSE A MOVIE");
+        for (int i = 0; i < movies.size(); i++) {
+            Movie m = movies.get(i);
+            Screen.option(i + 1, String.format("%-28s %-9s %-5s %s", m.getTitle(), m.getGenre(),
+                    m.getAgeRating(), m.getRuntime()));
+        }
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice();
+        if (choice < 1 || choice > movies.size()) {
+            Screen.info("Booking cancelled.");
+            return null;
+        }
+        return movies.get(choice - 1);
     }
 
-    // Returns the chosen seats, or null if the customer gave up / input was invalid
+    // STEP 2: schedules grouped by branch, numbered in the order they are shown
+    private Showtime chooseShowtime(Movie movie) {
+        Screen.section("STEP 2 OF 5: CHOOSE A SCHEDULE");
+        System.out.println("  " + movie.getTitle() + "  (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
+        ArrayList<Showtime> numbered = new ArrayList<>();
+        for (CinemaBranch branch : venueManager.getBranches()) {
+            boolean branchPrinted = false;
+            for (Showtime s : movieManager.getUpcomingShowtimes(movie)) {
+                if (venueManager.findBranchOfRoom(s.getRoom()) != branch) continue;
+                if (!branchPrinted) {
+                    System.out.println();
+                    System.out.println("  " + branch.getBranchName() + "  -  " + branch.getLocation());
+                    branchPrinted = true;
+                }
+                numbered.add(s);
+                String seatsLeft = s.getAvailableSeats().size() + " seats left";
+                if (s.getAvailableSeats().isEmpty()) {
+                    seatsLeft = "SOLD OUT";
+                }
+                Screen.option(numbered.size(), Format.shortDateTime(s.getStart()) + "   "
+                        + String.format("%-10s", s.getRoom().getRoomName()) + "   "
+                        + Format.peso(s.getBasePrice()) + "   " + seatsLeft);
+            }
+        }
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice();
+        if (choice < 1 || choice > numbered.size()) {
+            Screen.info("Booking cancelled.");
+            return null;
+        }
+        Showtime chosen = numbered.get(choice - 1);
+        if (chosen.getAvailableSeats().isEmpty()) {
+            Screen.error("Sorry, that schedule is sold out. Please choose another one.");
+            return null;
+        }
+        return chosen;
+    }
+
+    // STEP 3: returns the chosen seats, or null if the customer gave up / input was invalid
     private ArrayList<Seat> chooseSeats(Showtime showtime) {
-        String input = ConsoleReader.readLine("Seats, comma-separated (e.g. A1,A2) or blank to cancel: ");
+        System.out.println();
+        String input = ConsoleReader.readLine("Enter seat codes separated by commas (e.g. D5,D6), or blank to cancel: ");
         if (input.isEmpty()) {
             Screen.info("Booking cancelled.");
             return null;
@@ -193,15 +212,25 @@ public class BookingMenu {
             Screen.error("Please choose between 1 and " + MAX_SEATS_PER_BOOKING + " seats.");
             return null;
         }
+        Screen.success("Seats selected: " + seatListWithTypes(chosen));
         return chosen;
     }
 
+    private boolean chooseStudentTicket() {
+        System.out.println("  Ticket type:");
+        Screen.option(1, "Regular");
+        Screen.option(2, "Student (20% off, valid school ID required)");
+        return Screen.readChoice() == 2;
+    }
+
+    // STRATEGY PATTERN: each choice gives a different DiscountStrategy
     private DiscountStrategy chooseDiscount(Customer customer) {
-        boolean senior = customer.getAge() >= SeniorDiscount.MIN_AGE;
-        Screen.section("DISCOUNT");
-        Screen.option(1, "None");
+        System.out.println();
+        System.out.println("  Discount:");
+        Screen.option(1, "No discount");
         Screen.option(2, "Promo code");
-        if (senior) Screen.option(3, "Senior (20% off)");
+        Screen.option(3, "Senior citizen (20% off, age " + SeniorDiscount.MIN_AGE + "+)");
+        Screen.option(4, "PWD (20% off, valid PWD ID required)");
         int choice = Screen.readChoice();
         if (choice == 2) {
             Promo promo = promoManager.findPromo(ConsoleReader.readLine("Promo code: "));
@@ -209,27 +238,155 @@ public class BookingMenu {
                 Screen.error("Invalid promo code, continuing without a discount.");
                 return new NoDiscount();
             }
+            Screen.success("Promo code applied: " + promo.getPercentOff() + "% off.");
             return new PromoDiscount(promo);
         }
-        if (choice == 3 && senior) return new SeniorDiscount();
+        if (choice == 3) {
+            if (customer.getAge() >= SeniorDiscount.MIN_AGE) {
+                return new SeniorDiscount();
+            }
+            Screen.error("The senior citizen discount is only for customers aged " + SeniorDiscount.MIN_AGE
+                    + " and above. Continuing without a discount.");
+            return new NoDiscount();
+        }
+        if (choice == 4) {
+            String idNumber = ConsoleReader.readLine("PWD ID number: ");
+            if (idNumber.isEmpty()) {
+                Screen.error("A PWD ID number is required. Continuing without a discount.");
+                return new NoDiscount();
+            }
+            return new PwdDiscount(idNumber);
+        }
         return new NoDiscount();
     }
 
-    // Customer: see / cancel bookings
+    // STEP 5: receipt-style summary. Returns the total to pay.
+    private double printOrderSummary(Showtime showtime, ArrayList<Ticket> tickets, DiscountStrategy discount) {
+        Movie movie = showtime.getMovie();
+        System.out.println("  Movie    : " + movie.getTitle() + " (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
+        System.out.println("  Cinema   : " + cinemaName(showtime));
+        System.out.println("  Schedule : " + Format.dateTime(showtime.getStart()));
+        Screen.line();
+        double subtotal = 0;
+        for (Ticket t : tickets) {
+            System.out.println(String.format("    %-6s %-10s %-22s %15s", t.getSeat().getSeatNumber(),
+                    t.getSeat().getSeatType(), t.getTicketType(), Format.peso(t.calculatePrice())));
+            subtotal += t.calculatePrice();
+        }
+        double total = BookingManager.calculateTotal(tickets, discount);
+        Screen.line();
+        System.out.println(String.format("  %-42s %15s", "Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal)));
+        if (total < subtotal) {
+            System.out.println(String.format("  %-42s %15s", "Less: " + discount.getName(), "- " + Format.peso(subtotal - total)));
+        }
+        System.out.println(String.format("  %-42s %15s", "TOTAL", Format.peso(total)));
+        System.out.println("  All prices are VAT-inclusive.");
+        return total;
+    }
+
+    // STRATEGY PATTERN: each choice gives a different PaymentStrategy
+    private PaymentStrategy choosePayment() {
+        System.out.println();
+        System.out.println("  Payment method:");
+        Screen.option(1, "GCash");
+        Screen.option(2, "Maya");
+        Screen.option(3, "Credit/Debit Card");
+        Screen.option(4, "Cash (over the counter)");
+        int choice = Screen.readChoice();
+        if (choice == 1) return new EWalletPayment("GCash");
+        if (choice == 2) return new EWalletPayment("Maya");
+        if (choice == 3) return new CardPayment();
+        if (choice == 4) return new CashPayment();
+        Screen.error("Invalid payment method. Booking cancelled.");
+        return null;
+    }
+
+    // The same pay() call works for every payment method (POLYMORPHISM). Allows 3 attempts.
+    private boolean takePayment(PaymentStrategy payment, double amount) {
+        for (int attempt = 1; attempt <= MAX_PAYMENT_ATTEMPTS; attempt++) {
+            try {
+                payment.pay(amount);
+                return true;
+            } catch (PaymentException e) {
+                Screen.error("Payment failed: " + e.getMessage());
+                if (attempt < MAX_PAYMENT_ATTEMPTS) {
+                    Screen.info("Try again (" + attempt + "/" + MAX_PAYMENT_ATTEMPTS + ").");
+                }
+            }
+        }
+        return false;
+    }
+
+    private void printETicket(Booking booking) {
+        Showtime s = booking.getShowtime();
+        String paidWith = "-";
+        if (booking.getPayment() != null) {
+            paidWith = booking.getPayment().getDisplayName();
+        }
+        System.out.println();
+        Screen.border();
+        Screen.boxLine("C U R A T O R    E - T I C K E T");
+        Screen.boxDivider();
+        Screen.boxLeft("Booking Ref : " + booking.getBookingId());
+        Screen.boxLeft("Movie       : " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
+        Screen.boxLeft("Cinema      : " + cinemaName(s));
+        Screen.boxLeft("Schedule    : " + Format.dateTime(s.getStart()));
+        Screen.boxLeft("Seats       : " + seatListWithTypes(booking.getSeats()));
+        Screen.boxLeft("Tickets     : " + booking.getSeats().size() + " x " + booking.getTicketType());
+        Screen.boxLeft("Discount    : " + booking.getDiscountName());
+        Screen.boxLeft("Amount Paid : " + Format.peso(booking.getTotalPrice()) + " (" + paidWith + ")");
+        Screen.boxLeft("Status      : " + booking.getStatus());
+        Screen.boxDivider();
+        Screen.boxLine("Please arrive 15 minutes before the show starts.");
+        Screen.boxLine("Show this e-ticket at the cinema entrance. Enjoy the movie!");
+        Screen.border();
+    }
+
+    // ---------- customer: my bookings ----------
+
     public void viewMyBookings(Customer customer) {
-        Screen.title("MY BOOKINGS");
-        ArrayList<Booking> mine = BookingManager.getInstance().getBookingsForCustomer(customer.getUserId());
-        if (mine.isEmpty()) {
-            Screen.info("You have no bookings yet.");
+        boolean back = false;
+        while (!back) {
+            Screen.title("MY BOOKINGS");
+            ArrayList<Booking> mine = BookingManager.getInstance().getBookingsForCustomer(customer.getUserId());
+            if (mine.isEmpty()) {
+                Screen.info("You have no bookings yet. Choose 'Book a Ticket' to get started.");
+                return;
+            }
+            for (int i = 0; i < mine.size(); i++) {
+                Booking b = mine.get(i);
+                Screen.option(i + 1, String.format("%-10s %-25s %-21s %s", b.getBookingId(),
+                        b.getShowtime().getMovie().getTitle(), Format.shortDateTime(b.getShowtime().getStart()),
+                        b.getStatus()));
+            }
+            Screen.option(0, "Back");
+            int choice = Screen.readChoice();
+            if (choice == 0) {
+                back = true;
+            } else if (choice < 1 || choice > mine.size()) {
+                Screen.error("Invalid choice. Try again.");
+            } else {
+                showBooking(mine.get(choice - 1), customer);
+            }
+        }
+    }
+
+    // Shows the e-ticket, and lets the customer cancel if the show hasn't started yet
+    private void showBooking(Booking booking, Customer customer) {
+        printETicket(booking);
+        boolean canCancel = "CONFIRMED".equals(booking.getStatus()) && !booking.getShowtime().hasStarted();
+        if (canCancel) {
+            Screen.option(1, "Cancel this booking");
+        }
+        Screen.option(0, "Back");
+        int choice = Screen.readChoice();
+        if (choice != 1 || !canCancel) return;
+        if (!ConsoleReader.readYesNo("Cancel booking " + booking.getBookingId() + "? (y/n): ")) {
+            Screen.info("Your booking was kept.");
             return;
         }
-        for (Booking b : mine) System.out.println("  " + b);
-
-        System.out.println();
-        String id = ConsoleReader.readLine("Enter a Booking ID to cancel it (or blank to go back): ");
-        if (id.isEmpty()) return;
         try {
-            Booking cancelled = BookingManager.getInstance().cancelBooking(id, customer);
+            Booking cancelled = BookingManager.getInstance().cancelBooking(booking.getBookingId(), customer);
             Screen.success("Booking " + cancelled.getBookingId() + " cancelled.");
             if (cancelled.getPayment() != null) {
                 cancelled.getPayment().refund(cancelled.getTotalPrice());
@@ -239,7 +396,30 @@ public class BookingMenu {
         }
     }
 
-    // Admin: promo codes
+    // ---------- helpers ----------
+
+    private String cinemaName(Showtime showtime) {
+        CinemaBranch branch = venueManager.findBranchOfRoom(showtime.getRoom());
+        if (branch == null) {
+            return showtime.getRoom().getRoomName();
+        }
+        return branch.getBranchName() + " - " + showtime.getRoom().getRoomName();
+    }
+
+    // "D5, D6, F1 (VIP)"
+    private String seatListWithTypes(ArrayList<Seat> seats) {
+        String result = "";
+        for (Seat seat : seats) {
+            if (!result.isEmpty()) {
+                result += ", ";
+            }
+            result += seat.toString();
+        }
+        return result;
+    }
+
+    // ---------- admin: promo codes ----------
+
     public void managePromos() {
         boolean back = false;
         while (!back) {

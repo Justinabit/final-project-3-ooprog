@@ -3,6 +3,7 @@ package cinema.model;
 import java.util.ArrayList;
 
 import cinema.payment.PaymentStrategy;
+import cinema.util.Format;
 
 // [Member C] A confirmed (or cancelled) booking
 public class Booking {
@@ -13,6 +14,7 @@ public class Booking {
     private double totalPrice;
     private String status = "CONFIRMED";   // "CONFIRMED" or "CANCELLED"
     private String discountName = "No Discount";
+    private String ticketType = "Regular";  // "Regular" or "Student"
     private PaymentStrategy payment;       // remembered so a cancellation can refund the same way
 
     public Booking(String bookingId, Customer customer, Showtime showtime, ArrayList<Seat> seats, double totalPrice) {
@@ -31,6 +33,8 @@ public class Booking {
     public String getStatus() { return status; }
     public String getDiscountName() { return discountName; }
     public void setDiscountName(String discountName) { this.discountName = discountName; }
+    public String getTicketType() { return ticketType; }
+    public void setTicketType(String ticketType) { this.ticketType = ticketType; }
     public PaymentStrategy getPayment() { return payment; }
     public void setPayment(PaymentStrategy payment) { this.payment = payment; }
 
@@ -47,8 +51,8 @@ public class Booking {
 
     @Override
     public String toString() {
-        return bookingId + " | " + showtime.getMovie().getTitle() + " | " + showtime.getDateTime()
+        return bookingId + " | " + showtime.getMovie().getTitle() + " | " + Format.shortDateTime(showtime.getStart())
                 + " | " + showtime.getRoom().getRoomName() + " | Seats: " + getSeatList()
-                + " | " + String.format("$%.2f", totalPrice) + " | " + status;
+                + " | " + Format.peso(totalPrice) + " | " + status;
     }
 }

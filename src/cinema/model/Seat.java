@@ -2,18 +2,21 @@ package cinema.model;
 
 // [Member A] One seat in a room (ABSTRACTION: you can't create a plain "Seat").
 // StandardSeat and VipSeat extend it (INHERITANCE) and each one gives its own
-// type and price multiplier (POLYMORPHISM).
+// type and extra charge (POLYMORPHISM).
 public abstract class Seat {
-    public static final double VIP_MULTIPLIER = 1.5;
-
     private String seatId;      // example: "A1"
 
     public Seat(String seatId) {
         this.seatId = seatId;
     }
 
-    public abstract String getSeatType();          // "STANDARD" or "VIP"
-    public abstract double getPriceMultiplier();   // used by Member D for pricing
+    public abstract String getSeatType();       // "STANDARD" or "VIP"
+    public abstract double getExtraCharge();    // added on top of the showtime's base price
+
+    // Price of this seat for a showtime. Used by Member D's tickets.
+    public double getPrice(double basePrice) {
+        return basePrice + getExtraCharge();
+    }
 
     public String getSeatId() { return seatId; }
     public String getSeatNumber() { return seatId; }

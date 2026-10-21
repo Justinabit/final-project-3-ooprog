@@ -91,8 +91,8 @@ public class Validator {
     }
 
     public static void validateAgeRating(String rating) throws ValidationException {
-        if (rating == null || !rating.matches("G|PG|R-16|R-18")) {
-            throw new ValidationException("Age rating must be one of: G, PG, R-16, R-18.");
+        if (rating == null || !rating.matches("G|PG|R-13|R-16|R-18")) {
+            throw new ValidationException("Age rating must be one of: G, PG, R-13, R-16, R-18.");
         }
     }
 

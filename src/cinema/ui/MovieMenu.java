@@ -9,9 +9,11 @@ import cinema.model.CinemaBranch;
 import cinema.model.CinemaRoom;
 import cinema.model.Movie;
 import cinema.model.Showtime;
+import cinema.model.VipSeat;
 import cinema.service.MovieManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
 // [Member B] Browse catalog (customer) + manage movies and showtimes (admin)
 public class MovieMenu {
@@ -28,44 +30,40 @@ public class MovieMenu {
         boolean back = false;
         while (!back) {
             Screen.title("BROWSE MOVIES");
-            Screen.option(1, "All movies");
-            Screen.option(2, "Filter by genre");
-            Screen.option(3, "Filter by status (NOW SHOWING / COMING SOON)");
-            Screen.option(4, "View showtimes for a movie");
+            Screen.option(1, "Now Showing");
+            Screen.option(2, "Coming Soon");
+            Screen.option(3, "Search by title or genre");
+            Screen.option(4, "View schedules for a movie");
             Screen.option(0, "Back");
             int choice = Screen.readChoice();
             switch (choice) {
                 case 1:
-                    printMovies(movieManager.getMovies());
+                    Screen.section("NOW SHOWING");
+                    printMovies(moviesWithStatus("NOW SHOWING"));
                     break;
-                case 2: {
-                    String genre = ConsoleReader.readLine("Genre: ").toLowerCase();
-                    ArrayList<Movie> result = new ArrayList<>();
-                    for (Movie m : movieManager.getMovies()) {
-                        if (m.getGenre().toLowerCase().contains(genre)) result.add(m);
-                    }
-                    printMovies(result);
+                case 2:
+                    Screen.section("COMING SOON");
+                    printMovies(moviesWithStatus("COMING SOON"));
                     break;
-                }
                 case 3: {
-                    String status = ConsoleReader.readLine("Status (1 = NOW SHOWING, 2 = COMING SOON): ");
-                    String wanted = status.equals("1") ? "NOW SHOWING" : status.equals("2") ? "COMING SOON" : null;
-                    if (wanted == null) {
-                        Screen.error("Please enter 1 or 2.");
-                        break;
-                    }
+                    String keyword = ConsoleReader.readLine("Title or genre: ").toLowerCase();
                     ArrayList<Movie> result = new ArrayList<>();
                     for (Movie m : movieManager.getMovies()) {
-                        if (m.getStatus().equals(wanted)) result.add(m);
+                        if (m.getTitle().toLowerCase().contains(keyword) || m.getGenre().toLowerCase().contains(keyword)) {
+                            result.add(m);
+                        }
                     }
+                    Screen.section("SEARCH RESULTS");
                     printMovies(result);
                     break;
                 }
                 case 4: {
-                    Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID: "));
+                    printMovies(movieManager.getMovies());
+                    Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID (e.g. M-1): "));
                     if (m == null) {
                         Screen.error("Movie not found.");
                     } else {
+                        Screen.section("SCHEDULES: " + m.getTitle());
                         printShowtimes(movieManager.getUpcomingShowtimes(m));
                     }
                     break;
@@ -74,6 +72,14 @@ public class MovieMenu {
                 default: Screen.error("Invalid choice. Try again.");
             }
         }
+    }
+
+    private ArrayList<Movie> moviesWithStatus(String status) {
+        ArrayList<Movie> result = new ArrayList<>();
+        for (Movie m : movieManager.getMovies()) {
+            if (m.getStatus().equals(status)) result.add(m);
+        }
+        return result;
     }
 
     // Admin: add / edit / remove movies
@@ -101,7 +107,7 @@ public class MovieMenu {
     private void addMovie() {
         String title = ConsoleReader.readLine("Title: ");
         String genre = ConsoleReader.readLine("Genre: ");
-        String rating = ConsoleReader.readLine("Age rating (G, PG, R-16, R-18): ");
+        String rating = ConsoleReader.readLine("MTRCB rating (G, PG, R-13, R-16, R-18): ");
         int duration = ConsoleReader.readInt("Duration in minutes: ");
         String status = readStatus();
         try {
@@ -131,7 +137,7 @@ public class MovieMenu {
             switch (field) {
                 case 1: movieManager.renameMovie(m, ConsoleReader.readLine("New title: ")); break;
                 case 2: m.setGenre(ConsoleReader.readLine("New genre: ")); break;
-                case 3: m.setAgeRating(ConsoleReader.readLine("New age rating (G, PG, R-16, R-18): ")); break;
+                case 3: m.setAgeRating(ConsoleReader.readLine("New MTRCB rating (G, PG, R-13, R-16, R-18): ")); break;
                 case 4: m.setDurationMinutes(ConsoleReader.readInt("New duration in minutes: ")); break;
                 case 5: m.setStatus(readStatus()); break;
                 case 0: return;
@@ -218,7 +224,7 @@ public class MovieMenu {
             return;
         }
         String dateTime = ConsoleReader.readLine("Date and time (yyyy-MM-dd HH:mm): ");
-        double price = ConsoleReader.readDouble("Base ticket price: ");
+        double price = ConsoleReader.readDouble("Regular seat price in PHP (VIP seats add " + Format.peso(VipSeat.EXTRA_CHARGE) + "): ");
         try {
             Showtime s = new Showtime(movieManager.nextShowtimeId(), movie, room, dateTime, price);
             movieManager.addShowtime(s);
@@ -233,9 +239,12 @@ public class MovieMenu {
             Screen.info("No movies found.");
             return;
         }
+        System.out.println("  " + String.format(Movie.TABLE_FORMAT, "ID", "TITLE", "GENRE", "RATED", "RUNTIME", "STATUS"));
+        Screen.line();
         for (Movie m : list) System.out.println("  " + m);
     }
 
+    // Two lines per showtime: when and what, then where, price and seats left
     private void printShowtimes(ArrayList<Showtime> list) {
         if (list.isEmpty()) {
             Screen.info("No upcoming showtimes.");
@@ -243,8 +252,14 @@ public class MovieMenu {
         }
         for (Showtime s : list) {
             CinemaBranch b = venueManager.findBranchOfRoom(s.getRoom());
-            System.out.println("  " + s.describe(b == null ? null : b.getBranchName())
-                    + " | " + s.getAvailableSeats().size() + "/" + s.getCapacity() + " seats free");
+            String cinema = s.getRoom().getRoomName();
+            if (b != null) {
+                cinema = b.getBranchName() + " - " + cinema;
+            }
+            System.out.println("  " + String.format("%-5s", s.getShowtimeId()) + " " + Format.shortDateTime(s.getStart())
+                    + "   " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
+            System.out.println("        " + cinema + "   " + Format.peso(s.getBasePrice()) + "   "
+                    + s.getAvailableSeats().size() + "/" + s.getCapacity() + " seats left");
         }
     }
 }

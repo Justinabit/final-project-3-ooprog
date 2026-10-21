@@ -2,25 +2,27 @@ package cinema.payment;
 
 import cinema.exception.PaymentException;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
-// [Member D] Pay with cash
+// [Member D] Pay with cash at the cinema counter
 public class CashPayment implements PaymentStrategy {
     public String getDisplayName() { return "Cash"; }
 
     public void pay(double amount) throws PaymentException {
-        double tendered = ConsoleReader.readDouble("Enter cash amount tendered: ");
+        double tendered = ConsoleReader.readDouble("Enter cash amount tendered (PHP): ");
         if (tendered < amount) {
-            throw new PaymentException(String.format("Insufficient cash. Required: $%.2f, provided: $%.2f", amount, tendered));
+            throw new PaymentException("Insufficient cash. Required: " + Format.peso(amount)
+                    + ", provided: " + Format.peso(tendered));
         }
-        System.out.println(String.format("  Paid $%.2f in cash.", amount));
+        System.out.println("  Paid " + Format.peso(amount) + " in cash.");
         double change = tendered - amount;
         if (change > 0.004) {
-            System.out.println(String.format("  Change returned: $%.2f", change));
+            System.out.println("  Change: " + Format.peso(change));
         }
     }
 
     @Override
     public void refund(double amount) {
-        System.out.println(String.format("  Refund of $%.2f in cash is available at the counter.", amount));
+        System.out.println("  A cash refund of " + Format.peso(amount) + " is available at the cinema counter.");
     }
 }

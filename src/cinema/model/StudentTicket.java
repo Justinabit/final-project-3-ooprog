@@ -13,7 +13,7 @@ public class StudentTicket extends Ticket {
 
     @Override
     public double calculatePrice() {
-        return discount.applyDiscount(showtime.getBasePrice() * seat.getPriceMultiplier());
+        return discount.applyDiscount(seat.getPrice(showtime.getBasePrice()));
     }
 
     @Override

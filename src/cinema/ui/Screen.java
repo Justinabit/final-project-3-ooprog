@@ -67,9 +67,13 @@ public class Screen {
         System.out.println(" --- " + text + " " + repeat("-", WIDTH - 5 - text.length()));
     }
 
-    // One menu option, for example "   [1]  Register"
+    // One menu option, for example "   [1]  Register" (two-digit numbers stay lined up)
     public static void option(int number, String text) {
-        System.out.println("   [" + number + "]  " + text);
+        String label = "[" + number + "]";
+        if (number < 10) {
+            label = " " + label;
+        }
+        System.out.println("  " + label + "  " + text);
     }
 
     // Prints the bottom line of a menu and reads the user's choice
@@ -96,29 +100,48 @@ public class Screen {
         System.out.println("  [INFO] " + message);
     }
 
-    // ---------- small helpers ----------
+    // ---------- boxes (used for the welcome screen and the e-ticket) ----------
 
-    private static void border() {
+    public static void border() {
         System.out.println(" +" + repeat("=", WIDTH - 2) + "+");
     }
+
+    public static void boxDivider() {
+        System.out.println(" |" + repeat("-", WIDTH - 2) + "|");
+    }
+
+    // Prints text on the left side between two "|" walls (long text is cut off)
+    public static void boxLeft(String text) {
+        int inside = WIDTH - 4;
+        if (text.length() > inside) {
+            text = text.substring(0, inside);
+        }
+        System.out.println(" |  " + text + spaces(inside - text.length()) + "|");
+    }
+
+    // ---------- small helpers ----------
 
     private static void filmStrip() {
         System.out.println(" |" + repeat(" [] ", (WIDTH - 2) / 4) + "|");
     }
 
     // Prints text centered between two "|" walls
-    private static void boxLine(String text) {
-        int inside = WIDTH - 2;
-        int left = (inside - text.length()) / 2;
-        int right = inside - text.length() - left;
-        System.out.println(" |" + spaces(left) + text + spaces(right) + "|");
+    public static void boxLine(String text) {
+        System.out.println(" |" + center(text, WIDTH - 2) + "|");
     }
 
-    private static String spaces(int count) {
+    // Pads text with spaces on both sides so it is centered in the given width
+    public static String center(String text, int width) {
+        int left = (width - text.length()) / 2;
+        int right = width - text.length() - left;
+        return spaces(left) + text + spaces(right);
+    }
+
+    public static String spaces(int count) {
         return repeat(" ", count);
     }
 
-    private static String repeat(String text, int count) {
+    public static String repeat(String text, int count) {
         String result = "";
         for (int i = 0; i < count; i++) {
             result += text;

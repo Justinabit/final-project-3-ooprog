@@ -15,7 +15,7 @@ import cinema.model.Ticket;
 public class BookingManager {
     private static BookingManager instance;       // the one and only copy
     private ArrayList<Booking> bookings = new ArrayList<>();
-    private int bookingCounter = 0;               // never reused, so IDs stay unique
+    private int bookingCounter = 0;               // never reused, so booking references stay unique
 
     private BookingManager() { }                  // private so nobody can use "new"
 
@@ -59,7 +59,8 @@ public class BookingManager {
         }
 
         double total = calculateTotal(tickets, discount);
-        Booking booking = new Booking("BK-" + (++bookingCounter), customer, showtime, held, total);
+        // Booking reference like a real e-ticket: CUR-100001, CUR-100002, ...
+        Booking booking = new Booking("CUR-" + (100000 + (++bookingCounter)), customer, showtime, held, total);
         booking.setDiscountName(discount.getName());
         bookings.add(booking);
         return booking;

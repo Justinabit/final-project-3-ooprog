@@ -1,15 +1,25 @@
 package cinema;
 
+import java.util.ArrayList;
+
+import cinema.discount.NoDiscount;
 import cinema.exception.CinemaException;
+import cinema.layout.PremiumLayout;
 import cinema.model.Admin;
+import cinema.model.Booking;
 import cinema.model.CinemaBranch;
 import cinema.model.CinemaRoom;
 import cinema.model.Customer;
 import cinema.model.Movie;
-import cinema.model.Promo;
+import cinema.model.RegularTicket;
 import cinema.model.Showtime;
 import cinema.model.Ticket;
 import cinema.model.User;
+import cinema.payment.CardPayment;
+import cinema.payment.CashPayment;
+import cinema.payment.EWalletPayment;
+import cinema.payment.PaymentStrategy;
+import cinema.service.BookingManager;
 import cinema.service.MovieManager;
 import cinema.service.PromoManager;
 import cinema.service.ReportService;
@@ -45,42 +55,107 @@ public class Main {
 
     // [D] Fill the system with starter data so we can test without typing everything.
     // Showtimes are created relative to today so they are always in the future.
+    // Ratings and runtimes are sample values for this project.
     static void loadSampleData() {
         try {
-            // Default admin and one sample customer
+            // Accounts: the default admin and some customers
             userManager.addUser(new Admin(userManager.nextUserId(), "System Admin", "admin@cinema.com", "Admin123"));
             userManager.registerCustomer("Juan Dela Cruz", "juan@mail.com", "Customer1", 21);
+            Customer maria = new Customer(userManager.nextUserId(), "Maria Santos", "maria@mail.com", "Customer2", 19);
+            Customer jose = new Customer(userManager.nextUserId(), "Jose Reyes", "jose@mail.com", "Customer3", 34);
+            userManager.addUser(maria);
+            userManager.addUser(jose);
+            userManager.registerCustomer("Remedios Cruz", "lola@mail.com", "Senior123", 67);   // senior citizen
 
-            // Branches, rooms and seats (last row of each room is VIP)
-            CinemaBranch sm = new CinemaBranch(venueManager.nextBranchId(), "SM Mall Branch", "SM City, Main Street");
-            CinemaBranch ayala = new CinemaBranch(venueManager.nextBranchId(), "Ayala Branch", "Ayala Center, Business District");
+            // Branches and rooms (Standard = last row VIP, Premium = back half VIP)
+            CinemaBranch sm = new CinemaBranch(venueManager.nextBranchId(), "SM City Lipa", "Ayala Highway, Lipa City, Batangas");
+            CinemaBranch rob = new CinemaBranch(venueManager.nextBranchId(), "Robinsons Place Lipa", "JP Laurel Highway, Lipa City, Batangas");
             venueManager.addBranch(sm);
-            venueManager.addBranch(ayala);
-            CinemaRoom smRoom1 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 1", 5, 8);
-            CinemaRoom smRoom2 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 2", 4, 6);
-            CinemaRoom ayalaRoom1 = venueManager.addRoomToBranch(ayala.getBranchId(), "Cinema 1", 6, 10);
+            venueManager.addBranch(rob);
+            CinemaRoom sm1 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 1", 6, 10);
+            CinemaRoom sm2 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 2", 5, 8);
+            CinemaRoom sm3 = venueManager.addRoomToBranch(sm.getBranchId(), "Cinema 3", 4, 8, new PremiumLayout());
+            CinemaRoom rob1 = venueManager.addRoomToBranch(rob.getBranchId(), "Cinema 1", 6, 10, new PremiumLayout());
+            CinemaRoom rob2 = venueManager.addRoomToBranch(rob.getBranchId(), "Cinema 2", 5, 8);
 
-            // Movies
-            Movie m1 = new Movie(movieManager.nextMovieId(), "Space Odyssey", "Sci-Fi", "PG", 130, "NOW SHOWING");
-            Movie m2 = new Movie(movieManager.nextMovieId(), "Midnight Terror", "Horror", "R-16", 105, "NOW SHOWING");
-            Movie m3 = new Movie(movieManager.nextMovieId(), "Laugh Out Loud", "Comedy", "G", 95, "NOW SHOWING");
-            Movie m4 = new Movie(movieManager.nextMovieId(), "Dark Streets", "Crime", "R-18", 120, "NOW SHOWING");
-            Movie m5 = new Movie(movieManager.nextMovieId(), "Summer Dreams", "Romance", "PG", 110, "COMING SOON");
-            for (Movie m : new Movie[] {m1, m2, m3, m4, m5}) movieManager.addMovie(m);
+            // Movies (MTRCB ratings: G, PG, R-13, R-16, R-18)
+            Movie spiderMan = addMovie("Spider-Man: Brand New Day", "Superhero", "PG", 140, "NOW SHOWING");
+            Movie digger = addMovie("Digger", "Comedy", "R-13", 135, "NOW SHOWING");
+            Movie streetFighter = addMovie("Street Fighter", "Action", "R-13", 115, "NOW SHOWING");
+            Movie clayface = addMovie("Clayface", "Horror", "R-16", 110, "NOW SHOWING");
+            Movie socialReckoning = addMovie("The Social Reckoning", "Drama", "R-13", 125, "NOW SHOWING");
+            Movie terrifier = addMovie("Terrifier 4", "Horror", "R-18", 120, "NOW SHOWING");
+            addMovie("The Hunger Games: Sunrise on the Reaping", "Sci-Fi", "R-13", 140, "COMING SOON");
+            addMovie("Avengers: Doomsday", "Superhero", "PG", 150, "COMING SOON");
+            addMovie("Dune: Part Three", "Sci-Fi", "PG", 165, "COMING SOON");
 
-            // Showtimes (tomorrow and the day after)
+            // Showtimes for tomorrow (d1) and the day after (d2). Prices are for a regular seat.
             String d1 = java.time.LocalDate.now().plusDays(1).toString();
             String d2 = java.time.LocalDate.now().plusDays(2).toString();
-            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m1, smRoom1, d1 + " 14:00", 250));
-            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m2, smRoom1, d1 + " 19:00", 280));
-            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m3, smRoom2, d1 + " 16:00", 200));
-            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m4, ayalaRoom1, d2 + " 20:00", 300));
-            movieManager.addShowtime(new Showtime(movieManager.nextShowtimeId(), m1, ayalaRoom1, d2 + " 15:00", 270));
+
+            addShow(spiderMan, sm1, d1 + " 10:30", 400);
+            Showtime spiderManAfternoon = addShow(spiderMan, sm1, d1 + " 13:30", 400);
+            addShow(spiderMan, sm1, d1 + " 16:30", 400);
+            Showtime spiderManEvening = addShow(spiderMan, sm1, d1 + " 19:30", 400);
+            addShow(spiderMan, sm1, d2 + " 13:30", 400);
+            addShow(spiderMan, sm1, d2 + " 19:30", 400);
+
+            addShow(digger, sm2, d1 + " 11:00", 380);
+            addShow(streetFighter, sm2, d1 + " 14:00", 380);
+            addShow(digger, sm2, d1 + " 16:30", 380);
+            Showtime clayfaceEvening = addShow(clayface, sm2, d1 + " 19:30", 380);
+            addShow(streetFighter, sm2, d2 + " 15:00", 380);
+            addShow(clayface, sm2, d2 + " 20:00", 380);
+
+            addShow(socialReckoning, sm3, d1 + " 13:00", 360);
+            addShow(terrifier, sm3, d1 + " 21:30", 360);
+            addShow(socialReckoning, sm3, d2 + " 18:00", 360);
+
+            addShow(spiderMan, rob1, d1 + " 12:00", 370);
+            addShow(spiderMan, rob1, d1 + " 15:00", 370);
+            Showtime spiderManRobinsons = addShow(spiderMan, rob1, d1 + " 18:00", 370);
+            addShow(spiderMan, rob1, d2 + " 15:00", 370);
+            addShow(spiderMan, rob1, d2 + " 20:30", 370);
+
+            addShow(streetFighter, rob2, d1 + " 13:00", 350);
+            addShow(terrifier, rob2, d1 + " 22:00", 350);
+            addShow(digger, rob2, d2 + " 17:00", 350);
+
+            // Bookings by other customers, so some seats are already taken like in a real cinema
+            sampleBooking(maria, spiderManAfternoon, "D5,D6", new EWalletPayment("GCash"));
+            sampleBooking(jose, spiderManAfternoon, "F5,F6", new CardPayment());
+            sampleBooking(jose, spiderManEvening, "E4,E5,E6,E7", new CardPayment());
+            sampleBooking(maria, spiderManRobinsons, "C5,C6", new EWalletPayment("Maya"));
+            sampleBooking(jose, clayfaceEvening, "C3,C4", new CashPayment());
 
             promoManager.addPromo("WELCOME10", 10);
+            promoManager.addPromo("MOVIENIGHT", 15);
         } catch (CinemaException e) {
             Screen.error("Could not load sample data: " + e.getMessage());
         }
+    }
+
+    static Movie addMovie(String title, String genre, String rating, int minutes, String status) throws CinemaException {
+        Movie movie = new Movie(movieManager.nextMovieId(), title, genre, rating, minutes, status);
+        movieManager.addMovie(movie);
+        return movie;
+    }
+
+    static Showtime addShow(Movie movie, CinemaRoom room, String dateTime, double price) throws CinemaException {
+        Showtime showtime = new Showtime(movieManager.nextShowtimeId(), movie, room, dateTime, price);
+        movieManager.addShowtime(showtime);
+        return showtime;
+    }
+
+    // A paid booking made by another customer (regular tickets, no discount)
+    static void sampleBooking(Customer customer, Showtime showtime, String seatIds, PaymentStrategy payment)
+            throws CinemaException {
+        ArrayList<Ticket> tickets = new ArrayList<>();
+        for (String id : seatIds.split(",")) {
+            tickets.add(new RegularTicket(showtime, showtime.findSeat(id)));
+        }
+        Booking booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, new NoDiscount());
+        booking.setPayment(payment);
     }
 
     // ---------- MAIN MENU (not logged in) ----------
