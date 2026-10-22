@@ -7,6 +7,7 @@ import cinema.discount.NoDiscount;
 import cinema.discount.PromoDiscount;
 import cinema.discount.PwdDiscount;
 import cinema.discount.SeniorDiscount;
+import cinema.discount.StudentDiscount;
 import cinema.exception.BookingException;
 import cinema.exception.PaymentException;
 import cinema.exception.ValidationException;
@@ -84,10 +85,15 @@ public class BookingMenu {
                 tickets.add(new RegularTicket(showtime, seat));
             }
         }
+        DiscountStrategy discount;
         if (student) {
+            // One discount per booking: student tickets get the student discount and nothing else.
             Screen.info("Note: " + tickets.get(0).getEligibilityNote());
+            Screen.info("The student discount (" + StudentDiscount.PERCENT + "% off) cannot be combined with other discounts.");
+            discount = new StudentDiscount();
+        } else {
+            discount = chooseDiscount(customer);
         }
-        DiscountStrategy discount = chooseDiscount(customer);
 
         // STEP 5: review and pay
         Screen.section("STEP 5 OF 5: REVIEW AND PAY");
@@ -102,7 +108,6 @@ public class BookingMenu {
         // Hold the seats first, then take the payment. If payment fails, release the seats.
         try {
             Booking booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, discount);
-            booking.setTicketType(tickets.get(0).getTicketType());
             if (!takePayment(payment, booking.getTotalPrice())) {
                 BookingManager.getInstance().discardBooking(booking);
                 Screen.info("Booking cancelled; your seats were released.");
@@ -267,17 +272,18 @@ public class BookingMenu {
         System.out.println("  Cinema   : " + cinemaName(showtime));
         System.out.println("  Schedule : " + Format.dateTime(showtime.getStart()));
         Screen.line();
-        double subtotal = 0;
         for (Ticket t : tickets) {
             System.out.println(String.format("    %-6s %-10s %-22s %15s", t.getSeat().getSeatNumber(),
-                    t.getSeat().getSeatType(), t.getTicketType(), Format.peso(t.calculatePrice())));
-            subtotal += t.calculatePrice();
+                    t.getSeat().getSeatType(), t.getTicketType(),
+                    Format.peso(BookingManager.round2(t.calculatePrice()))));
         }
+        double subtotal = BookingManager.calculateSubtotal(tickets);
         double total = BookingManager.calculateTotal(tickets, discount);
         Screen.line();
         System.out.println(String.format("  %-42s %15s", "Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal)));
         if (total < subtotal) {
-            System.out.println(String.format("  %-42s %15s", "Less: " + discount.getName(), "- " + Format.peso(subtotal - total)));
+            System.out.println(String.format("  %-42s %15s", "Less: " + discount.getName(),
+                    "- " + Format.peso(BookingManager.round2(subtotal - total))));
         }
         System.out.println(String.format("  %-42s %15s", "TOTAL", Format.peso(total)));
         System.out.println("  All prices are VAT-inclusive.");
@@ -333,7 +339,11 @@ public class BookingMenu {
         Screen.boxLeft("Schedule    : " + Format.dateTime(s.getStart()));
         Screen.boxLeft("Seats       : " + seatListWithTypes(booking.getSeats()));
         Screen.boxLeft("Tickets     : " + booking.getSeats().size() + " x " + booking.getTicketType());
+        Screen.boxLeft("Subtotal    : " + Format.peso(booking.getSubtotal()));
         Screen.boxLeft("Discount    : " + booking.getDiscountName());
+        if (booking.getDiscountAmount() > 0) {
+            Screen.boxLeft("You saved   : " + Format.peso(booking.getDiscountAmount()));
+        }
         Screen.boxLeft("Amount Paid : " + Format.peso(booking.getTotalPrice()) + " (" + paidWith + ")");
         Screen.boxLeft("Status      : " + booking.getStatus());
         Screen.boxDivider();
@@ -387,10 +397,8 @@ public class BookingMenu {
         }
         try {
             Booking cancelled = BookingManager.getInstance().cancelBooking(booking.getBookingId(), customer);
+            // BookingManager already refunded the payment as part of cancelling.
             Screen.success("Booking " + cancelled.getBookingId() + " cancelled.");
-            if (cancelled.getPayment() != null) {
-                cancelled.getPayment().refund(cancelled.getTotalPrice());
-            }
         } catch (BookingException e) {
             Screen.error(e.getMessage());
         }

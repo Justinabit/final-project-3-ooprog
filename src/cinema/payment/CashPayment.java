@@ -10,14 +10,16 @@ public class CashPayment implements PaymentStrategy {
 
     public void pay(double amount) throws PaymentException {
         double tendered = ConsoleReader.readDouble("Enter cash amount tendered (PHP): ");
-        if (tendered < amount) {
+        // Compare in whole centavos so floating-point error can't reject exact cash.
+        long dueCents = Math.round(amount * 100);
+        long tenderedCents = Math.round(tendered * 100);
+        if (tenderedCents < dueCents) {
             throw new PaymentException("Insufficient cash. Required: " + Format.peso(amount)
                     + ", provided: " + Format.peso(tendered));
         }
         System.out.println("  Paid " + Format.peso(amount) + " in cash.");
-        double change = tendered - amount;
-        if (change > 0.004) {
-            System.out.println("  Change: " + Format.peso(change));
+        if (tenderedCents > dueCents) {
+            System.out.println("  Change: " + Format.peso((tenderedCents - dueCents) / 100.0));
         }
     }
 
