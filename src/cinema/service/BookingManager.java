@@ -3,6 +3,7 @@ package cinema.service;
 import java.util.ArrayList;
 
 import cinema.discount.DiscountStrategy;
+import cinema.discount.StudentDiscount;
 import cinema.exception.BookingException;
 import cinema.model.Booking;
 import cinema.model.Customer;
@@ -26,11 +27,39 @@ public class BookingManager {
         return instance;
     }
 
-    // Total = sum of each ticket's own price (seat type + ticket type), then the discount on top.
-    public static double calculateTotal(ArrayList<Ticket> tickets, DiscountStrategy discount) {
+    // Rounds to whole centavos, so every printed amount adds up exactly to the total.
+    public static double round2(double amount) {
+        return Math.round(amount * 100.0) / 100.0;
+    }
+
+    // Sum of each ticket's own price (seat type + showtime base price), BEFORE any discount.
+    public static double calculateSubtotal(ArrayList<Ticket> tickets) {
         double subtotal = 0;
-        for (Ticket t : tickets) subtotal += t.calculatePrice();
-        return Math.round(discount.applyDiscount(subtotal) * 100.0) / 100.0;
+        for (Ticket t : tickets) subtotal += round2(t.calculatePrice());
+        return round2(subtotal);
+    }
+
+    // Subtotal minus the ONE discount of the booking. Never below 0 and never above the subtotal.
+    public static double calculateTotal(ArrayList<Ticket> tickets, DiscountStrategy discount) {
+        double subtotal = calculateSubtotal(tickets);
+        double total = round2(discount.applyDiscount(subtotal));
+        return Math.max(0, Math.min(subtotal, total));
+    }
+
+    // One discount per booking: student tickets get exactly the student discount, and the student
+    // discount is only for student tickets. Anything else would stack discounts.
+    private static void checkDiscountRule(ArrayList<Ticket> tickets, DiscountStrategy discount) throws BookingException {
+        boolean studentTickets = false;
+        for (Ticket t : tickets) {
+            if ("Student".equals(t.getTicketType())) studentTickets = true;
+        }
+        boolean studentDiscount = discount instanceof StudentDiscount;
+        if (studentTickets && !studentDiscount) {
+            throw new BookingException("Student tickets cannot be combined with another discount.");
+        }
+        if (!studentTickets && studentDiscount) {
+            throw new BookingException("The student discount needs student tickets.");
+        }
     }
 
     // One ticket per seat. Seats are held first; if any fails, the ones already held are released.
@@ -46,6 +75,7 @@ public class BookingManager {
             throw new BookingException("You must be at least " + showtime.getMovie().getMinimumAge()
                     + " to watch a " + showtime.getMovie().getAgeRating() + " movie.");
         }
+        checkDiscountRule(tickets, discount);
 
         ArrayList<Seat> held = new ArrayList<>();
         try {
@@ -58,10 +88,11 @@ public class BookingManager {
             throw e;
         }
 
+        double subtotal = calculateSubtotal(tickets);
         double total = calculateTotal(tickets, discount);
         // Booking reference like a real e-ticket: CUR-100001, CUR-100002, ...
-        Booking booking = new Booking("CUR-" + (100000 + (++bookingCounter)), customer, showtime, held, total);
-        booking.setDiscountName(discount.getName());
+        Booking booking = new Booking("CUR-" + (100000 + (++bookingCounter)), customer, showtime, held,
+                subtotal, total, discount.getName(), tickets.get(0).getTicketType());
         bookings.add(booking);
         return booking;
     }
@@ -74,7 +105,8 @@ public class BookingManager {
         bookings.remove(booking);
     }
 
-    // requester may be null (admin use); a customer can only cancel their own booking
+    // requester may be null (admin use); a customer can only cancel their own booking.
+    // Cancelling frees the seats AND refunds the payment the same way it was made.
     public Booking cancelBooking(String bookingId, Customer requester) throws BookingException {
         Booking found = null;
         for (Booking b : bookings) {
@@ -83,7 +115,7 @@ public class BookingManager {
                 break;
             }
         }
-        if (found == null || (requester != null && found.getCustomer() != requester)) {
+        if (found == null || (requester != null && !found.getCustomer().getUserId().equalsIgnoreCase(requester.getUserId()))) {
             throw new BookingException("Booking ID " + bookingId + " not found.");
         }
         if ("CANCELLED".equals(found.getStatus())) {
@@ -96,6 +128,11 @@ public class BookingManager {
         found.cancel();
         for (Seat seat : found.getSeats()) {
             found.getShowtime().releaseSeat(seat.getSeatNumber());
+        }
+        // The refund is part of cancelling, so it happens on every cancel path (customer or admin).
+        if (found.getPayment() != null) {
+            found.getPayment().refund(found.getTotalPrice());
+            found.markRefunded(found.getTotalPrice());
         }
         return found;
     }

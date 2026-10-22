@@ -1,19 +1,15 @@
 package cinema.model;
 
-import cinema.discount.DiscountStrategy;
-import cinema.discount.StudentDiscount;
-
-// [Member D] Student ticket: 20% off the regular price (reuses StudentDiscount)
+// [Member D] Student ticket. It is priced at the regular seat price; the 20% student discount is
+// applied ONCE at booking level by StudentDiscount, so it can never stack with another discount.
 public class StudentTicket extends Ticket {
-    private final DiscountStrategy discount = new StudentDiscount();
-
     public StudentTicket(Showtime showtime, Seat seat) {
         super(showtime, seat);
     }
 
     @Override
     public double calculatePrice() {
-        return discount.applyDiscount(seat.getPrice(showtime.getBasePrice()));
+        return seat.getPrice(showtime.getBasePrice());
     }
 
     @Override
