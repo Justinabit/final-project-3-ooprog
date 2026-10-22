@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+# Cinema Booking System (Skeleton)
+=======
 # CURATOR - Cinema Booking System
 
 ## Project structure
@@ -15,6 +18,7 @@ src/cinema/
 ├── exception/       CinemaException + Validation/Login/Booking/Payment/VenueException
 └── util/            Validator, ConsoleReader, Format (pesos and dates)
 ```
+>>>>>>> main
 
 ## How to run
 From the project root:
