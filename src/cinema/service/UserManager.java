@@ -79,15 +79,9 @@ public class UserManager {
     // Customers use their email; admins can also use their username (see Admin.matchesLogin).
     // After User.MAX_FAILED_LOGINS wrong passwords in a row the account is locked for a while.
     public User login(String emailOrUsername, String password) throws LoginException {
-        User found = null;
-        for (User u : users) {
-            if (u.matchesLogin(emailOrUsername)) {
-                found = u;
-                break;
-            }
-        }
+        User found = findByLogin(emailOrUsername);
         if (found == null) {
-            throw new LoginException("Invalid email or password.");
+            throw new LoginException("No account found with that email or username.");
         }
         if (found.isLocked()) {
             throw new LoginException("Too many wrong passwords. This account is locked until "
@@ -98,13 +92,24 @@ public class UserManager {
                 throw new LoginException("Too many wrong passwords. This account is now locked for "
                         + User.LOCK_MINUTES + " minutes.");
             }
-            throw new LoginException("Invalid email or password.");
+            throw new LoginException("Wrong password.");
         }
         if (!found.isActive()) {
             throw new LoginException("This account has been deactivated. Please contact an admin.");
         }
         found.unlock();   // a correct password clears the wrong-password count
         return found;
+    }
+
+    // The account that logs in with this email (or admin username), or null if there is none.
+    // The login screen uses it to check the email right after it is typed, before asking for the password.
+    public User findByLogin(String emailOrUsername) {
+        for (User u : users) {
+            if (u.matchesLogin(emailOrUsername)) {
+                return u;
+            }
+        }
+        return null;
     }
 
     public ArrayList<Customer> getAllCustomers() {

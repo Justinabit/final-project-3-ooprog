@@ -96,8 +96,10 @@ public class VenueMenu {
 
     private void addBranch() {
         Screen.section("ADD A BRANCH");
-        String name = ConsoleReader.readLine("Branch name: ");
-        String location = ConsoleReader.readLine("Location: ");
+        String name = askBranchName("Branch name (blank to cancel): ", null);
+        if (name == null) return;
+        String location = askLocation("Location (blank to cancel): ");
+        if (location == null) return;
         try {
             CinemaBranch branch = venueManager.createBranch(name, location);
             Screen.success("Branch added with ID " + branch.getBranchId() + ".");
@@ -117,13 +119,15 @@ public class VenueMenu {
         int choice = Screen.readChoice(2);
         try {
             if (choice == 1) {
-                venueManager.renameBranch(branch, ConsoleReader.readLine("New branch name: "));
+                String name = askBranchName("New branch name (blank to cancel): ", branch);
+                if (name == null) return;
+                venueManager.renameBranch(branch, name);
                 Screen.success("Branch renamed to " + branch.getBranchName() + ".");
             } else if (choice == 2) {
-                branch.setLocation(ConsoleReader.readLine("New location: "));
+                String location = askLocation("New location (blank to cancel): ");
+                if (location == null) return;
+                branch.setLocation(location);
                 Screen.success("Location updated.");
-            } else if (choice != 0) {
-                Screen.error("Invalid choice.");
             }
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
@@ -156,11 +160,8 @@ public class VenueMenu {
         CinemaBranch branch = chooseBranch();
         if (branch == null) return;
         // each answer is checked right after it is typed, and asked again if it is wrong
-        String name = askRoomName(branch);
-        if (name == null) {
-            Screen.info("Cancelled. No room was added.");
-            return;
-        }
+        String name = askRoomName("Room name (blank to cancel): ", branch, null);
+        if (name == null) return;
         int rows = ConsoleReader.readNumber("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS
                 + ", lettered A-Z): ", "Rows", VenueManager.MIN_ROWS, VenueManager.MAX_ROWS);
         int perRow = ConsoleReader.readNumber("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
@@ -178,25 +179,6 @@ public class VenueMenu {
             printSeatMap(room);
         } catch (CinemaException e) {   // ValidationException or VenueException
             Screen.error(e.getMessage());
-        }
-    }
-
-    // Asks until the name is valid and not used by another room in this branch. Blank = cancel (returns null).
-    private String askRoomName(CinemaBranch branch) {
-        while (true) {
-            String name = ConsoleReader.readLine("Room name (blank to cancel): ");
-            if (name.isEmpty()) {
-                return null;
-            }
-            try {
-                Validator.validateRoomName(name);
-                if (!branch.hasRoomNamed(name, null)) {
-                    return name;
-                }
-                Screen.error("A room named '" + name + "' already exists in this branch.");
-            } catch (ValidationException e) {
-                Screen.error(e.getMessage());
-            }
         }
     }
 
@@ -218,8 +200,10 @@ public class VenueMenu {
     private void renameRoom() {
         CinemaRoom room = chooseRoom();
         if (room == null) return;
+        String name = askRoomName("New room name (blank to cancel): ", venueManager.findBranchOfRoom(room), room);
+        if (name == null) return;
         try {
-            venueManager.renameRoom(room, ConsoleReader.readLine("New room name: "));
+            venueManager.renameRoom(room, name);
             Screen.success("Room renamed to " + room.getRoomName() + ".");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
@@ -253,11 +237,10 @@ public class VenueMenu {
         CinemaRoom room = chooseRoom();
         if (room == null) return;
         printSeatMap(room);
-        String seatId = ConsoleReader.readLine("Seat to change (e.g. A1): ");
-        if (room.findSeat(seatId) == null) {
-            Screen.error("Seat " + seatId.toUpperCase() + " does not exist in this room.");
-            return;
-        }
+        String seatId = askSeatToChange(room);
+        if (seatId == null) return;
+        Seat seat = room.findSeat(seatId);
+        Screen.info("Seat " + seat.getSeatNumber() + " is currently " + seat.getSeatType() + ".");
         Screen.option(1, "Standard seat");
         Screen.option(2, "VIP seat (+" + Format.peso(VipSeat.EXTRA_CHARGE) + ")");
         Screen.option(0, "Cancel");
@@ -268,7 +251,7 @@ public class VenueMenu {
         }
         try {
             venueManager.changeSeatType(room, seatId, choice == 2, movieManager.getShowtimes());
-            Seat seat = room.findSeat(seatId);
+            seat = room.findSeat(seatId);   // changing the type replaces the seat object
             Screen.success("Seat " + seat.getSeatNumber() + " is now " + seat.getSeatType() + ".");
             Screen.info("Bookings that were already made keep the price they paid.");
         } catch (ValidationException e) {
@@ -283,7 +266,75 @@ public class VenueMenu {
         SeatMap.print(room, null);
     }
 
-    // ---------- helpers ----------
+    // ---------- helpers: each answer is checked as soon as it is typed and asked again if wrong ----------
+    // (a blank answer cancels and returns null)
+
+    // ignore = the branch being renamed (it may keep its own name), or null for a new branch
+    private String askBranchName(String prompt, CinemaBranch ignore) {
+        while (true) {
+            String name = ConsoleReader.readLine(prompt);
+            if (name.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkBranchName(name, ignore);
+                return name;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    private String askLocation(String prompt) {
+        while (true) {
+            String location = ConsoleReader.readLine(prompt);
+            if (location.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                Validator.validateLocation(location);
+                return location;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // ignore = the room being renamed, or null for a new room
+    private String askRoomName(String prompt, CinemaBranch branch, CinemaRoom ignore) {
+        while (true) {
+            String name = ConsoleReader.readLine(prompt);
+            if (name.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkRoomName(branch, name, ignore);
+                return name;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // The seat must exist and must not be booked for a show that hasn't ended
+    private String askSeatToChange(CinemaRoom room) {
+        while (true) {
+            String seatId = ConsoleReader.readLine("Seat to change (e.g. A1, blank to cancel): ");
+            if (seatId.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkSeatCanChange(room, seatId, movieManager.getShowtimes());
+                return seatId;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
 
     private CinemaBranch chooseBranch() {
         if (venueManager.getBranches().isEmpty()) {
@@ -293,11 +344,18 @@ public class VenueMenu {
         for (CinemaBranch b : venueManager.getBranches()) {
             System.out.println("  " + b.getBranchId() + "  " + b.getBranchName());
         }
-        CinemaBranch branch = venueManager.findBranch(ConsoleReader.readLine("Branch ID: "));
-        if (branch == null) {
-            Screen.error("Branch not found.");
+        while (true) {
+            String id = ConsoleReader.readLine("Branch ID (blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            CinemaBranch branch = venueManager.findBranch(id);
+            if (branch != null) {
+                return branch;
+            }
+            Screen.error("No branch with the ID " + id.toUpperCase() + ". Please try again.");
         }
-        return branch;
     }
 
     private CinemaRoom chooseRoom() {
@@ -313,11 +371,18 @@ public class VenueMenu {
             Screen.info("No rooms yet. Add a room first.");
             return null;
         }
-        CinemaRoom room = venueManager.findRoom(ConsoleReader.readLine("Room ID: "));
-        if (room == null) {
-            Screen.error("Room not found.");
+        while (true) {
+            String id = ConsoleReader.readLine("Room ID (blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            CinemaRoom room = venueManager.findRoom(id);
+            if (room != null) {
+                return room;
+            }
+            Screen.error("No room with the ID " + id.toUpperCase() + ". Please try again.");
         }
-        return room;
     }
 
     private int countUpcomingShows(CinemaRoom room) {

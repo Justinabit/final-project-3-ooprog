@@ -46,7 +46,7 @@ public class Movie {
     }
 
     public void setDurationMinutes(int durationMinutes) throws ValidationException {
-        Validator.validateRange("Duration (minutes)", durationMinutes, 1, 600);
+        Validator.validateRange("Duration (minutes)", durationMinutes, 1, Validator.MAX_DURATION_MINUTES);
         this.durationMinutes = durationMinutes;
     }
 

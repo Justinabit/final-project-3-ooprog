@@ -53,17 +53,6 @@ public class ConsoleReader {
         }
     }
 
-    // Keeps asking until the user types a valid whole number
-    public static int readInt(String prompt) {
-        while (true) {
-            try {
-                return Integer.parseInt(readLine(prompt));
-            } catch (NumberFormatException e) {
-                System.out.println("  [ !! ] Please enter a number.");
-            }
-        }
-    }
-
     // Keeps asking until the user types a whole number from min to max. The number is checked as soon as
     // it is typed, so a wrong value is asked again right away (not after the whole form is filled in).
     // label is used in the message, e.g. "Rows must be between 2 and 26."

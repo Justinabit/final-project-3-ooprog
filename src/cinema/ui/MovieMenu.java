@@ -1,5 +1,6 @@
 package cinema.ui;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 
 import cinema.exception.BookingException;
@@ -49,7 +50,11 @@ public class MovieMenu {
                         printMovies(moviesWithStatus("COMING SOON"));
                         break;
                     case 3: {
-                        String keyword = ConsoleReader.readLine("Title or genre: ").toLowerCase();
+                        String keyword = ConsoleReader.readLine("Title or genre (blank to cancel): ").toLowerCase();
+                        if (keyword.isEmpty()) {
+                            Screen.info("Cancelled.");
+                            break;
+                        }
                         ArrayList<Movie> result = new ArrayList<>();
                         for (Movie m : movieManager.getMovies()) {
                             if (m.getTitle().toLowerCase().contains(keyword) || m.getGenre().toLowerCase().contains(keyword)) {
@@ -62,10 +67,8 @@ public class MovieMenu {
                     }
                     case 4: {
                         printMovies(movieManager.getMovies());
-                        Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID (e.g. M-1): "));
-                        if (m == null) {
-                            Screen.error("Movie not found.");
-                        } else {
+                        Movie m = chooseMovie("Movie ID (e.g. M-1, blank to cancel): ", movieManager.getMovies());
+                        if (m != null) {
                             Screen.section("SCHEDULES: " + m.getTitle());
                             printShowtimes(movieManager.getUpcomingShowtimes(m));
                         }
@@ -114,11 +117,14 @@ public class MovieMenu {
         }
     }
 
+    // Each answer is checked as soon as it is typed and asked again if it is wrong
     private void addMovie() {
-        String title = ConsoleReader.readLine("Title: ");
+        String title = askTitle("Title (blank to cancel): ", null);
+        if (title == null) return;
         String genre = readGenre();
-        String rating = ConsoleReader.readLine("MTRCB rating (G, PG, R-13, R-16, R-18): ");
-        int duration = ConsoleReader.readInt("Duration in minutes (1-600): ");
+        String rating = askRating("MTRCB rating (G, PG, R-13, R-16, R-18): ");
+        int duration = ConsoleReader.readNumber("Duration in minutes (1-" + Validator.MAX_DURATION_MINUTES + "): ",
+                "Duration (minutes)", 1, Validator.MAX_DURATION_MINUTES);
         String status = readStatus();
         try {
             Movie movie = movieManager.createMovie(title, genre, rating, duration, status);
@@ -154,21 +160,84 @@ public class MovieMenu {
         }
     }
 
-    private void editMovie() {
-        Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID to edit: "));
-        if (m == null) {
-            Screen.error("Movie not found.");
-            return;
+    // Title, rating and duration are checked as soon as they are typed and asked again if wrong
+    private String askTitle(String prompt, Movie ignore) {
+        while (true) {
+            String title = ConsoleReader.readLine(prompt);
+            if (title.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                movieManager.checkTitle(title, ignore);
+                return title;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
         }
+    }
+
+    private String askRating(String prompt) {
+        while (true) {
+            String rating = ConsoleReader.readLine(prompt).toUpperCase();
+            try {
+                Validator.validateAgeRating(rating);
+                return rating;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // The new length must also fit between the other shows in the same rooms
+    private void askNewDuration(Movie m) {
+        while (true) {
+            int minutes = ConsoleReader.readNumber("New duration in minutes (1-" + Validator.MAX_DURATION_MINUTES + "): ",
+                    "Duration (minutes)", 1, Validator.MAX_DURATION_MINUTES);
+            try {
+                movieManager.changeDuration(m, minutes);
+                return;
+            } catch (CinemaException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // Asks until the ID is one of the movies in the list. Returns null if left blank.
+    private Movie chooseMovie(String prompt, ArrayList<Movie> allowed) {
+        while (true) {
+            String id = ConsoleReader.readLine(prompt);
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            Movie m = movieManager.findMovie(id);
+            if (m == null) {
+                Screen.error("No movie with the ID " + id.toUpperCase() + ". Please try again.");
+            } else if (!allowed.contains(m)) {
+                Screen.error(m.getTitle() + " can't be chosen here. Please choose one of the movies listed.");
+            } else {
+                return m;
+            }
+        }
+    }
+
+    private void editMovie() {
+        Movie m = chooseMovie("Movie ID to edit (blank to cancel): ", movieManager.getMovies());
+        if (m == null) return;
         System.out.println("  " + m);
         System.out.println("   [1] Title  [2] Genre  [3] Age rating  [4] Duration  [5] Status  [0] Cancel");
         int field = ConsoleReader.readChoice("Edit which field? ", 5);
         try {
             switch (field) {
-                case 1: movieManager.renameMovie(m, ConsoleReader.readLine("New title: ")); break;
+                case 1:
+                    String title = askTitle("New title (blank to cancel): ", m);
+                    if (title == null) return;
+                    movieManager.renameMovie(m, title);
+                    break;
                 case 2: m.setGenre(readGenre()); break;
-                case 3: m.setAgeRating(ConsoleReader.readLine("New MTRCB rating (G, PG, R-13, R-16, R-18): ")); break;
-                case 4: movieManager.changeDuration(m, ConsoleReader.readInt("New duration in minutes (1-600): ")); break;
+                case 3: m.setAgeRating(askRating("New MTRCB rating (G, PG, R-13, R-16, R-18): ")); break;
+                case 4: askNewDuration(m); break;
                 case 5: m.setStatus(readStatus()); break;
                 case 0: return;
                 default: Screen.error("Invalid choice."); return;
@@ -180,18 +249,14 @@ public class MovieMenu {
     }
 
     private void removeMovie() {
-        String id = ConsoleReader.readLine("Movie ID to remove: ");
-        Movie m = movieManager.findMovie(id);
-        if (m == null) {
-            Screen.error("Movie not found.");
-            return;
-        }
+        Movie m = chooseMovie("Movie ID to remove (blank to cancel): ", movieManager.getMovies());
+        if (m == null) return;
         if (!ConsoleReader.readYesNo("Remove '" + m.getTitle() + "' and its showtimes? (y/n): ")) {
             Screen.info("Cancelled.");
             return;
         }
         try {
-            movieManager.removeMovie(id);
+            movieManager.removeMovie(m.getMovieId());
             Screen.success("Movie removed.");
         } catch (BookingException e) {
             Screen.error(e.getMessage());
@@ -234,11 +299,8 @@ public class MovieMenu {
             return;
         }
         printMovies(showing);
-        Movie movie = movieManager.findMovie(ConsoleReader.readLine("Movie ID: "));
-        if (movie == null || !showing.contains(movie)) {
-            Screen.error("Please choose one of the NOW SHOWING movies listed.");
-            return;
-        }
+        Movie movie = chooseMovie("Movie ID (blank to cancel): ", showing);
+        if (movie == null) return;
 
         boolean anyRoom = false;
         for (CinemaBranch b : venueManager.getBranches()) {
@@ -253,28 +315,64 @@ public class MovieMenu {
             Screen.error("No rooms exist yet. Add a branch and room first.");
             return;
         }
-        CinemaRoom room = venueManager.findRoom(ConsoleReader.readLine("Room ID: "));
-        if (room == null) {
-            Screen.error("Room not found.");
-            return;
-        }
-        if (room.getSeats().isEmpty()) {
-            Screen.error("That room has no seats.");
-            return;
+        CinemaRoom room = null;
+        while (room == null) {   // asked again until the ID belongs to a room
+            String id = ConsoleReader.readLine("Room ID (blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            room = venueManager.findRoom(id);
+            if (room == null) {
+                Screen.error("No room with the ID " + id.toUpperCase() + ". Please try again.");
+            }
         }
         Screen.info("Cinema hours: shows start between 9:00 AM and 11:30 PM, up to " + Validator.MAX_DAYS_AHEAD + " days ahead.");
-        String dateTime = ConsoleReader.readLine("Date and time (yyyy-MM-dd HH:mm): ");
-        double price = ConsoleReader.readAmount("Regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
+        LocalDateTime start = askShowtimeStart(movie, room);
+        if (start == null) return;
+        double price = askPrice("Regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
                 + " - " + Format.peso(Validator.MAX_TICKET_PRICE) + "; VIP seats add " + Format.peso(VipSeat.EXTRA_CHARGE) + "): ");
         try {
-            Showtime s = movieManager.createShowtime(movie, room, dateTime, price);
+            Showtime s = movieManager.createShowtime(movie, room, start.format(Validator.DATE_TIME_FORMAT), price);
             Screen.success("Showtime added with ID " + s.getShowtimeId() + ".");
         } catch (CinemaException e) {   // ValidationException or BookingException
             Screen.error(e.getMessage());
         }
     }
 
-    // Picks one of the upcoming showtimes by its ID (null if not found)
+    // Asked again until the date and time are right: the format, not in the past, during cinema hours
+    // and the room is free for the whole movie. Returns null if left blank.
+    private LocalDateTime askShowtimeStart(Movie movie, CinemaRoom room) {
+        while (true) {
+            String text = ConsoleReader.readLine("Date and time (yyyy-MM-dd HH:mm, blank to cancel): ");
+            if (text.isEmpty()) {
+                Screen.info("Cancelled. No showtime was added.");
+                return null;
+            }
+            try {
+                LocalDateTime start = Validator.validateDateTime(text);
+                movieManager.checkNewShowtime(movie, room, start);
+                return start;
+            } catch (CinemaException e) {   // ValidationException or BookingException (room in use)
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // Asked again until the price is between the minimum and maximum
+    private double askPrice(String prompt) {
+        while (true) {
+            double price = ConsoleReader.readAmount(prompt);
+            try {
+                Validator.validatePrice(price);
+                return price;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // Picks one of the upcoming showtimes by its ID, asked again until it is one of them (null if left blank)
     private Showtime chooseUpcomingShowtime() {
         ArrayList<Showtime> upcoming = movieManager.getUpcomingShowtimes(null);
         if (upcoming.isEmpty()) {
@@ -282,19 +380,25 @@ public class MovieMenu {
             return null;
         }
         printShowtimes(upcoming);
-        Showtime s = movieManager.findShowtime(ConsoleReader.readLine("Showtime ID (e.g. S-1): "));
-        if (s == null || !upcoming.contains(s)) {
+        while (true) {
+            String id = ConsoleReader.readLine("Showtime ID (e.g. S-1, blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            Showtime s = movieManager.findShowtime(id);
+            if (s != null && upcoming.contains(s)) {
+                return s;
+            }
             Screen.error("Please choose one of the upcoming showtimes listed.");
-            return null;
         }
-        return s;
     }
 
     // New bookings pay the new price; bookings already made keep what they paid
     private void changePrice() {
         Showtime s = chooseUpcomingShowtime();
         if (s == null) return;
-        double price = ConsoleReader.readAmount("New regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
+        double price = askPrice("New regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
                 + " - " + Format.peso(Validator.MAX_TICKET_PRICE) + "): ");
         try {
             s.setBasePrice(price);

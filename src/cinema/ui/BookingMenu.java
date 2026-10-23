@@ -587,11 +587,7 @@ public class BookingMenu {
                         printPromos();
                         break;
                     case 3:
-                        if (promoManager.removePromo(ConsoleReader.readLine("Code to remove: "))) {
-                            Screen.success("Promo code removed.");
-                        } else {
-                            Screen.error("No such promo code.");
-                        }
+                        removePromo();
                         break;
                     case 0: back = true; break;
                     default: Screen.error("Invalid choice. Try again.");
@@ -619,17 +615,71 @@ public class BookingMenu {
         }
     }
 
+    // Each answer is checked as soon as it is typed and asked again if it is wrong
     private void addPromo() {
-        String code = ConsoleReader.readLine("New code (3-15 letters/digits): ");
-        int percent = ConsoleReader.readInt("Percent off (1-90): ");
-        String endDate = ConsoleReader.readLine("Valid until (yyyy-MM-dd, up to " + Validator.MAX_DAYS_AHEAD + " days ahead): ");
+        String code = askNewPromoCode();
+        if (code == null) return;
+        int percent = ConsoleReader.readNumber("Percent off (1-90): ", "Discount percent", 1, 90);
+        LocalDate validUntil = askPromoEndDate();
+        if (validUntil == null) return;
         try {
-            LocalDate validUntil = Validator.validatePromoEndDate(endDate);
             promoManager.addPromo(code, percent, validUntil);
             Screen.success("Promo code " + code.trim().toUpperCase() + " added (" + percent + "% off until "
                     + Format.date(validUntil) + ", once per customer).");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
+        }
+    }
+
+    // 3-15 letters/digits and not used yet. Returns null if left blank.
+    private String askNewPromoCode() {
+        while (true) {
+            String code = ConsoleReader.readLine("New code (3-15 letters/digits, blank to cancel): ");
+            if (code.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                Validator.validatePromoCode(code);
+                if (promoManager.findPromo(code) == null) {
+                    return code;
+                }
+                Screen.error("Promo code " + code.toUpperCase() + " already exists.");
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // From today up to one year ahead. Returns null if left blank.
+    private LocalDate askPromoEndDate() {
+        while (true) {
+            String text = ConsoleReader.readLine("Valid until (yyyy-MM-dd, up to " + Validator.MAX_DAYS_AHEAD
+                    + " days ahead, blank to cancel): ");
+            if (text.isEmpty()) {
+                Screen.info("Cancelled. No promo code was added.");
+                return null;
+            }
+            try {
+                return Validator.validatePromoEndDate(text);
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    private void removePromo() {
+        while (true) {   // asked again until the code exists
+            String code = ConsoleReader.readLine("Code to remove (blank to cancel): ");
+            if (code.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            if (promoManager.removePromo(code)) {
+                Screen.success("Promo code " + code.toUpperCase() + " removed.");
+                return;
+            }
+            Screen.error("No promo code " + code.toUpperCase() + ". Please try again.");
         }
     }
 }

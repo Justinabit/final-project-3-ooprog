@@ -28,6 +28,7 @@ public class Validator {
     public static final int MIN_PASSWORD_LENGTH = 8;
     public static final int MAX_PASSWORD_LENGTH = 64;
     public static final int MAX_TITLE_LENGTH = 60;
+    public static final int MAX_DURATION_MINUTES = 600;
     public static final double MIN_TICKET_PRICE = 100;
     public static final double MAX_TICKET_PRICE = 2000;
     public static final LocalTime FIRST_SHOW = LocalTime.of(9, 0);     // cinema opening time

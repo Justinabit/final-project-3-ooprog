@@ -105,21 +105,34 @@ public class RecordsMenu {
     }
 
     private void bookingsOfCustomer() {
-        Customer customer = userManager.findCustomer(ConsoleReader.readLine("Customer ID (e.g. U-2): "));
-        if (customer == null) {
-            Screen.error("No customer with that ID.");
-            return;
+        Customer customer = null;
+        while (customer == null) {   // asked again until the ID belongs to a customer
+            String id = ConsoleReader.readLine("Customer ID (e.g. U-2, blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            customer = userManager.findCustomer(id);
+            if (customer == null) {
+                Screen.error("No customer with the ID " + id.toUpperCase() + ". Please try again.");
+            }
         }
         Screen.section("BOOKINGS OF " + customer.getName().toUpperCase());
         printBookings(BookingManager.getInstance().getBookingsForCustomer(customer.getUserId()));
     }
 
     private void openBooking() {
-        Booking booking = BookingManager.getInstance().findBooking(
-                ConsoleReader.readLine("Booking reference (e.g. CUR-100001): "));
-        if (booking == null) {
-            Screen.error("No booking with that reference.");
-            return;
+        Booking booking = null;
+        while (booking == null) {   // asked again until the reference belongs to a booking
+            String reference = ConsoleReader.readLine("Booking reference (e.g. CUR-100001, blank to cancel): ");
+            if (reference.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            booking = BookingManager.getInstance().findBooking(reference);
+            if (booking == null) {
+                Screen.error("No booking with the reference " + reference.toUpperCase() + ". Please try again.");
+            }
         }
         Customer c = booking.getCustomer();
         bookingMenu.printETicket(booking);

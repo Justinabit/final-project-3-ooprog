@@ -15,18 +15,24 @@ public class CashPayment implements PaymentStrategy {
 
     public void pay(double amount) throws PaymentException {
         PaymentStrategy.validateAmount(amount);
-        // readAmount only accepts amounts like 500 or 500.50 (no "NaN", "-100", "1e3" or 3 decimals)
-        double tendered = ConsoleReader.readAmount("Enter cash amount tendered (PHP): ");
-        if (tendered > MAX_TENDERED) {
-            throw new PaymentException("That cash amount is too large. The maximum is " + Format.peso(MAX_TENDERED) + ".");
-        }
-
         // BigDecimal compares exact centavos, so floating-point error can't reject exact cash.
         BigDecimal due = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal given = BigDecimal.valueOf(tendered).setScale(2, RoundingMode.HALF_UP);
-        if (given.compareTo(due) < 0) {
-            throw new PaymentException("Insufficient cash. Required: " + Format.peso(amount)
-                    + ", provided: " + Format.peso(tendered));
+        BigDecimal given;
+        // readAmount only accepts amounts like 500 or 500.50 (no "NaN", "-100", "1e3" or 3 decimals).
+        // Too much or too little is asked again right away.
+        while (true) {
+            double tendered = ConsoleReader.readAmount("Enter cash amount tendered (PHP): ");
+            given = BigDecimal.valueOf(tendered).setScale(2, RoundingMode.HALF_UP);
+            if (tendered > MAX_TENDERED) {
+                System.out.println("  [ !! ] That cash amount is too large. The maximum is " + Format.peso(MAX_TENDERED) + ".");
+            } else if (given.compareTo(due) < 0) {
+                System.out.println("  [ !! ] Insufficient cash. Required: " + Format.peso(amount) + ", provided: "
+                        + Format.peso(tendered) + ".");
+                System.out.println("  [INFO] Enter at least " + Format.peso(amount) + ", or type "
+                        + ConsoleReader.RETURN_COMMAND + " to choose another way to pay.");
+            } else {
+                break;
+            }
         }
         System.out.println("  Paid " + Format.peso(amount) + " in cash.");
         BigDecimal change = given.subtract(due);

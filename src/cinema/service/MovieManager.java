@@ -48,19 +48,25 @@ public class MovieManager {
 
     // Renaming must also keep titles unique
     public void renameMovie(Movie movie, String newTitle) throws ValidationException {
-        Validator.validateTitle(newTitle);
+        checkTitle(newTitle, movie);
+        movie.setTitle(newTitle);
+    }
+
+    // A title must be valid and not used by another movie. The menu calls this right after the title is
+    // typed. ignore = the movie being renamed (it may keep its own title), or null for a new movie.
+    public void checkTitle(String title, Movie ignore) throws ValidationException {
+        Validator.validateTitle(title);
         for (Movie m : movies) {
-            if (m != movie && m.getTitle().equalsIgnoreCase(newTitle.trim())) {
-                throw new ValidationException("A movie titled '" + newTitle.trim() + "' already exists.");
+            if (m != ignore && m.getTitle().equalsIgnoreCase(Validator.cleanSpaces(title))) {
+                throw new ValidationException("A movie titled '" + Validator.cleanSpaces(title) + "' already exists.");
             }
         }
-        movie.setTitle(newTitle);
     }
 
     // A longer movie must still fit between the other shows in each room, so every upcoming
     // showtime of this movie is checked with the new length before anything is changed.
     public void changeDuration(Movie movie, int minutes) throws CinemaException {
-        Validator.validateRange("Duration (minutes)", minutes, 1, 600);
+        Validator.validateRange("Duration (minutes)", minutes, 1, Validator.MAX_DURATION_MINUTES);
         for (Showtime s : showtimes) {
             if (s.getMovie() != movie || s.isCancelled() || s.hasEnded()) continue;
             LocalDateTime newEnd = s.getStart().plusMinutes(minutes);
@@ -121,19 +127,30 @@ public class MovieManager {
             throw new BookingException("That movie is not in the catalog.");
         }
         if (!showtime.isCancelled()) {
-            for (Showtime other : showtimes) {
-                if (other.getRoom() != showtime.getRoom() || other.isCancelled()) continue;
-                if (overlaps(showtime.getStart(), showtime.getEnd(), other.getStart(), other.getEnd())) {
-                    throw new BookingException("Room '" + showtime.getRoom().getRoomName() + "' is already in use from "
-                            + other.getDateTime() + " (" + other.getMovie().getTitle() + ", ends "
-                            + other.getEnd().format(Validator.DATE_TIME_FORMAT) + ").");
-                }
-            }
+            checkRoomIsFree(showtime.getRoom(), showtime.getStart(), showtime.getEnd());
         }
         int number = Integer.parseInt(showtime.getShowtimeId().substring(2));   // "S-12" -> 12
         showtimes.add(showtime);
         if (number > showtimeCounter) {
             showtimeCounter = number;
+        }
+    }
+
+    // Checks a new show's start time right after it is typed: not in the past, during cinema hours,
+    // and the room is free for the whole movie (plus the cleaning gap)
+    public void checkNewShowtime(Movie movie, CinemaRoom room, LocalDateTime start) throws CinemaException {
+        Validator.validateShowtimeStart(start);
+        checkRoomIsFree(room, start, start.plusMinutes(movie.getDurationMinutes()));
+    }
+
+    private void checkRoomIsFree(CinemaRoom room, LocalDateTime start, LocalDateTime end) throws BookingException {
+        for (Showtime other : showtimes) {
+            if (other.getRoom() != room || other.isCancelled()) continue;
+            if (overlaps(start, end, other.getStart(), other.getEnd())) {
+                throw new BookingException("Room '" + room.getRoomName() + "' is already in use from "
+                        + other.getDateTime() + " (" + other.getMovie().getTitle() + ", ends "
+                        + other.getEnd().format(Validator.DATE_TIME_FORMAT) + ").");
+            }
         }
     }
 
