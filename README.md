@@ -90,6 +90,7 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 ## Input rules (all in `util/Validator.java`)
 | Field | Rule |
 |---|---|
+| Menu choice | exactly the number shown, nothing else: one digit (0-9) in every menu. Long lists with 10+ items (e.g. 11 schedules) also take the number shown, like `10`. ` 1`, `1 `, `01`, `+1`, `1.0` and numbers that are not listed are rejected and asked again |
 | Name | 2-50 characters; letters (ñ, é... allowed), spaces, and `. ' -` after a letter; extra spaces are removed |
 | Email | like `name@example.com`, no `..`, ending of 2+ letters, max 100 characters, saved in lowercase, unique |
 | Password | 8-64 characters with an uppercase letter, a lowercase letter and a number; no spaces or `\|` |
@@ -109,6 +110,8 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 
 ## Behaviour decisions
 - Every screen asks again after a wrong entry; a blank line or `0` cancels. Yes/no questions accept only y / n.
+- Admin menu (one digit each): 1 Registered Users, 2 Booked Tickets / Transactions / Data Files, 3 Accounts,
+  4 Venues, 5 Movies, 6 Showtimes, 7 Promo Codes, 8 Reports (revenue / attendance), 9 My Profile, 0 Logout.
 - Login: 3 tries per visit; 5 wrong passwords in a row lock the account for 15 minutes (an admin can unlock it).
 - Customers can't change their own birthdate (that would get around age ratings and the senior discount);
   an admin can correct it after checking an ID. The age is worked out from the birthdate, so it is always current.

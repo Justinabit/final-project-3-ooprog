@@ -76,10 +76,10 @@ public class Screen {
         System.out.println("  " + label + "  " + text);
     }
 
-    // Prints the bottom line of a menu and reads the user's choice
-    public static int readChoice() {
+    // Prints the bottom line of a menu and reads the user's choice (0 to max, exactly as shown)
+    public static int readChoice(int max) {
         line();
-        return ConsoleReader.readInt("Enter your choice: ");
+        return ConsoleReader.readChoice("Enter your choice: ", max);
     }
 
     public static void line() {

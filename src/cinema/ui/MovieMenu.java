@@ -36,7 +36,7 @@ public class MovieMenu {
             Screen.option(3, "Search by title or genre");
             Screen.option(4, "View schedules for a movie");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(4);
             switch (choice) {
                 case 1:
                     Screen.section("NOW SHOWING");
@@ -93,7 +93,7 @@ public class MovieMenu {
             Screen.option(3, "Remove movie");
             Screen.option(4, "List movies");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(4);
             switch (choice) {
                 case 1: addMovie(); break;
                 case 2: editMovie(); break;
@@ -128,17 +128,21 @@ public class MovieMenu {
         }
         System.out.println();
         while (true) {
-            int choice = ConsoleReader.readInt("Genre number: ");
-            if (choice >= 1 && choice <= Validator.GENRES.length) {
+            int choice = ConsoleReader.readChoice("Genre number: ", Validator.GENRES.length);
+            if (choice >= 1) {
                 return Validator.GENRES[choice - 1];
             }
-            Screen.error("Please enter a number from 1 to " + Validator.GENRES.length + ".");
+            Screen.error("Please choose a genre from 1 to " + Validator.GENRES.length + ".");
         }
     }
 
     private String readStatus() {
-        String s = ConsoleReader.readLine("Status (1 = NOW SHOWING, 2 = COMING SOON): ");
-        return s.equals("1") ? "NOW SHOWING" : s.equals("2") ? "COMING SOON" : s;
+        while (true) {
+            int choice = ConsoleReader.readChoice("Status (1 = NOW SHOWING, 2 = COMING SOON): ", 2);
+            if (choice == 1) return "NOW SHOWING";
+            if (choice == 2) return "COMING SOON";
+            Screen.error("Please type 1 or 2.");
+        }
     }
 
     private void editMovie() {
@@ -149,7 +153,7 @@ public class MovieMenu {
         }
         System.out.println("  " + m);
         System.out.println("   [1] Title  [2] Genre  [3] Age rating  [4] Duration  [5] Status  [0] Cancel");
-        int field = ConsoleReader.readInt("Edit which field? ");
+        int field = ConsoleReader.readChoice("Edit which field? ", 5);
         try {
             switch (field) {
                 case 1: movieManager.renameMovie(m, ConsoleReader.readLine("New title: ")); break;
@@ -195,7 +199,7 @@ public class MovieMenu {
             Screen.option(3, "Change a showtime's price");
             Screen.option(4, "Cancel a showtime (refunds every booking)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(4);
             switch (choice) {
                 case 1: addShowtime(); break;
                 case 2: printShowtimes(movieManager.getUpcomingShowtimes(null)); break;

@@ -41,7 +41,7 @@ public class VenueMenu {
             Screen.option(8, "View a room's seat map");
             Screen.option(9, "Change a seat type (Standard / VIP)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(9);
             switch (choice) {
                 case 1: viewAll(); break;
                 case 2: addBranch(); break;
@@ -106,7 +106,7 @@ public class VenueMenu {
         Screen.option(1, "Change name");
         Screen.option(2, "Change location");
         Screen.option(0, "Cancel");
-        int choice = Screen.readChoice();
+        int choice = Screen.readChoice(2);
         try {
             if (choice == 1) {
                 venueManager.renameBranch(branch, ConsoleReader.readLine("New branch name: "));
@@ -152,6 +152,10 @@ public class VenueMenu {
         int perRow = ConsoleReader.readInt("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
                 + VenueManager.MAX_SEATS_PER_ROW + "): ");
         SeatLayoutStrategy layout = chooseLayout();
+        if (layout == null) {
+            Screen.info("Cancelled. No room was added.");
+            return;
+        }
         try {
             CinemaRoom room = venueManager.addRoomToBranch(branch.getBranchId(), name, rows, perRow, layout);
             Screen.success("Room added with ID " + room.getRoomId() + " (" + room.getSeats().size()
@@ -162,17 +166,17 @@ public class VenueMenu {
         }
     }
 
-    // STRATEGY PATTERN: the admin picks how the VIP seats are arranged
+    // STRATEGY PATTERN: the admin picks how the VIP seats are arranged. Returns null if cancelled.
     private SeatLayoutStrategy chooseLayout() {
         SeatLayoutStrategy[] layouts = { new StandardLayout(), new PremiumLayout(), new EconomyLayout() };
         Screen.section("SEAT LAYOUT");
         for (int i = 0; i < layouts.length; i++) {
             Screen.option(i + 1, layouts[i].getName());
         }
-        int choice = Screen.readChoice();
-        if (choice < 1 || choice > layouts.length) {
-            Screen.info("Using the Standard layout.");
-            return layouts[0];
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice(layouts.length);
+        if (choice == 0) {
+            return null;
         }
         return layouts[choice - 1];
     }
@@ -222,9 +226,10 @@ public class VenueMenu {
         }
         Screen.option(1, "Standard seat");
         Screen.option(2, "VIP seat (+" + Format.peso(VipSeat.EXTRA_CHARGE) + ")");
-        int choice = Screen.readChoice();
-        if (choice != 1 && choice != 2) {
-            Screen.error("Invalid choice.");
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice(2);
+        if (choice == 0) {
+            Screen.info("Cancelled. The seat was not changed.");
             return;
         }
         try {

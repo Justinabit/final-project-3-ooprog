@@ -103,7 +103,7 @@ public class Main {
             Screen.option(2, "Customer Login");
             Screen.option(3, "Admin Login");
             Screen.option(0, "Exit");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(3);
             try {
                 switch (choice) {
                     case 1:
@@ -145,7 +145,7 @@ public class Main {
             Screen.option(3, "My Bookings");
             Screen.option(4, "My Profile");
             Screen.option(0, "Logout");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(4);
             try {
                 switch (choice) {
                     case 1:
@@ -181,18 +181,16 @@ public class Main {
             Screen.title("ADMIN MENU");
             Screen.info("Logged in as " + admin.getName() + " (" + admin.getRole() + ")");
             Screen.option(1, "View Registered Users");
-            Screen.option(2, "View Booked Tickets and Transactions");
+            Screen.option(2, "Booked Tickets, Transactions and Data Files");
             Screen.option(3, "Manage Accounts");
             Screen.option(4, "Manage Venues (branches / rooms / seats)");
             Screen.option(5, "Manage Movies");
             Screen.option(6, "Manage Showtimes");
             Screen.option(7, "Manage Promo Codes");
-            Screen.option(8, "Revenue Report");
-            Screen.option(9, "Attendance Report");
-            Screen.option(10, "Data Files (saved records)");
-            Screen.option(11, "My Profile");
+            Screen.option(8, "Reports (revenue / attendance)");
+            Screen.option(9, "My Profile");
             Screen.option(0, "Logout");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(9);
             try {
                 switch (choice) {
                     case 1:
@@ -217,15 +215,9 @@ public class Main {
                         bookingMenu.managePromos();                      // [C]
                         break;
                     case 8:
-                        reportService.showRevenueReport();               // [D]
+                        reportsMenu();                                   // [D]
                         break;
                     case 9:
-                        reportService.showAttendanceReport();            // [D]
-                        break;
-                    case 10:
-                        recordsMenu.showDataFiles();
-                        break;
-                    case 11:
                         accountMenu.viewProfile(admin);                  // [A]
                         break;
                     case 0:
@@ -239,6 +231,28 @@ public class Main {
                 handleUnexpectedError(e);
             }
             saveData();
+        }
+    }
+
+    // ---------- REPORTS (admin) ----------
+    static void reportsMenu() {
+        boolean back = false;
+        while (!back) {
+            Screen.title("REPORTS (ADMIN)");
+            Screen.option(1, "Revenue Report");
+            Screen.option(2, "Attendance Report");
+            Screen.option(0, "Back");
+            int choice = Screen.readChoice(2);
+            switch (choice) {
+                case 1:
+                    reportService.showRevenueReport();
+                    break;
+                case 2:
+                    reportService.showAttendanceReport();
+                    break;
+                default:
+                    back = true;
+            }
         }
     }
 }

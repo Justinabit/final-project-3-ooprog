@@ -70,13 +70,14 @@ public class RecordsMenu {
     public void viewBookings() {
         boolean back = false;
         while (!back) {
-            Screen.title("BOOKED TICKETS (ADMIN)");
+            Screen.title("BOOKED TICKETS, TRANSACTIONS AND FILES (ADMIN)");
             Screen.option(1, "All bookings");
             Screen.option(2, "Bookings of one customer");
             Screen.option(3, "Open a booking by reference (e-ticket / cancel)");
             Screen.option(4, "Transaction log (every payment and refund)");
+            Screen.option(5, "Data files (saved records)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(5);
             switch (choice) {
                 case 1:
                     Screen.section("ALL BOOKINGS");
@@ -90,6 +91,9 @@ public class RecordsMenu {
                     break;
                 case 4:
                     printTransactions();
+                    break;
+                case 5:
+                    showDataFiles();
                     break;
                 case 0:
                     back = true;
@@ -125,12 +129,14 @@ public class RecordsMenu {
         }
 
         boolean canCancel = "CONFIRMED".equals(booking.getStatus()) && !booking.getShowtime().hasStarted();
+        int lastOption = 0;
         if (canCancel) {
             Screen.option(1, "Cancel this booking and refund the customer");
+            lastOption = 1;
         }
         Screen.option(0, "Back");
-        int choice = Screen.readChoice();
-        if (choice != 1 || !canCancel) return;
+        int choice = Screen.readChoice(lastOption);
+        if (choice != 1) return;
         if (!ConsoleReader.readYesNo("Cancel booking " + booking.getBookingId() + "? (y/n): ")) {
             Screen.info("The booking was kept.");
             return;
@@ -197,7 +203,7 @@ public class RecordsMenu {
 
     // ---------- data files ----------
 
-    public void showDataFiles() {
+    private void showDataFiles() {
         boolean back = false;
         while (!back) {
             Screen.title("DATA FILES (ADMIN)");
@@ -216,7 +222,7 @@ public class RecordsMenu {
             Screen.line();
             Screen.option(1, "Save now");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(1);
             if (choice == 1) {
                 try {
                     fileManager.saveAll();

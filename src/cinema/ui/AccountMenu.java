@@ -117,7 +117,7 @@ public class AccountMenu {
             if (user instanceof Customer) {
                 Screen.info("To correct your birthdate, please ask an admin (bring a valid ID).");
             }
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(3);
             switch (choice) {
                 case 1:
                     editName(user);
@@ -189,7 +189,7 @@ public class AccountMenu {
             Screen.option(7, "Correct a customer's birthdate (check their ID)");
             Screen.option(8, "Create an admin account");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(8);
             switch (choice) {
                 case 1:
                     listAllAccounts();

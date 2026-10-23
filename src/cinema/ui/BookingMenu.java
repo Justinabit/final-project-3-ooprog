@@ -78,7 +78,7 @@ public class BookingMenu {
         Screen.option(1, "Regular");
         Screen.option(2, "Student (20% off, valid school ID required)");
         Screen.option(0, "Cancel booking");
-        int ticketType = readOption(2);
+        int ticketType = Screen.readChoice(2);
         if (ticketType == 0) {
             Screen.info("Booking cancelled.");
             return;
@@ -168,7 +168,7 @@ public class BookingMenu {
         }
         Screen.option(0, "Cancel");
         while (true) {
-            int choice = readOption(movies.size());
+            int choice = Screen.readChoice(movies.size());
             if (choice == 0) {
                 Screen.info("Booking cancelled.");
                 return null;
@@ -208,7 +208,7 @@ public class BookingMenu {
         }
         Screen.option(0, "Cancel");
         while (true) {
-            int choice = readOption(numbered.size());
+            int choice = Screen.readChoice(numbered.size());
             if (choice == 0) {
                 Screen.info("Booking cancelled.");
                 return null;
@@ -275,7 +275,7 @@ public class BookingMenu {
             Screen.option(3, "Senior citizen (20% off, age " + SeniorDiscount.MIN_AGE + "+)");
             Screen.option(4, "PWD (20% off, valid PWD ID required)");
             Screen.option(0, "Cancel booking");
-            int choice = readOption(4);
+            int choice = Screen.readChoice(4);
             if (choice == 0) {
                 return null;
             }
@@ -375,7 +375,7 @@ public class BookingMenu {
         Screen.option(3, "Credit/Debit Card (Visa / Mastercard)");
         Screen.option(4, "Cash (over the counter)");
         Screen.option(0, "Cancel booking");
-        int choice = readOption(4);
+        int choice = Screen.readChoice(4);
         if (choice == 1) return new EWalletPayment("GCash");
         if (choice == 2) return new EWalletPayment("Maya");
         if (choice == 3) return new CardPayment();
@@ -451,7 +451,7 @@ public class BookingMenu {
                         b.getStatus()));
             }
             Screen.option(0, "Back");
-            int choice = readOption(mine.size());
+            int choice = Screen.readChoice(mine.size());
             if (choice == 0) {
                 back = true;
             } else {
@@ -475,7 +475,7 @@ public class BookingMenu {
         if (canCancel) {
             lastOption = 1;
         }
-        int choice = readOption(lastOption);
+        int choice = Screen.readChoice(lastOption);
         if (choice != 1) return;
         if (!ConsoleReader.readYesNo("Cancel booking " + booking.getBookingId() + "? (y/n): ")) {
             Screen.info("Your booking was kept.");
@@ -491,17 +491,6 @@ public class BookingMenu {
     }
 
     // ---------- helpers ----------
-
-    // Keeps asking until the choice is between 0 and max
-    private int readOption(int max) {
-        while (true) {
-            int choice = Screen.readChoice();
-            if (choice >= 0 && choice <= max) {
-                return choice;
-            }
-            Screen.error("Invalid choice. Please enter a number from 0 to " + max + ".");
-        }
-    }
 
     private String cinemaName(Showtime showtime) {
         return venueManager.getCinemaName(showtime.getRoom());
@@ -529,7 +518,7 @@ public class BookingMenu {
             Screen.option(2, "List promo codes");
             Screen.option(3, "Remove promo code");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
+            int choice = Screen.readChoice(3);
             switch (choice) {
                 case 1:
                     addPromo();
