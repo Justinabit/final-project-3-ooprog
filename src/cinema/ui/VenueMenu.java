@@ -1,6 +1,7 @@
 package cinema.ui;
 
 import cinema.exception.CinemaException;
+import cinema.exception.GoBackException;
 import cinema.exception.ValidationException;
 import cinema.exception.VenueException;
 import cinema.layout.EconomyLayout;
@@ -16,6 +17,7 @@ import cinema.service.MovieManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
 import cinema.util.Format;
+import cinema.util.Validator;
 
 // [Member A] Admin menu for branches, rooms and seats
 public class VenueMenu {
@@ -41,19 +43,23 @@ public class VenueMenu {
             Screen.option(8, "View a room's seat map");
             Screen.option(9, "Change a seat type (Standard / VIP)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
-            switch (choice) {
-                case 1: viewAll(); break;
-                case 2: addBranch(); break;
-                case 3: editBranch(); break;
-                case 4: removeBranch(); break;
-                case 5: addRoom(); break;
-                case 6: renameRoom(); break;
-                case 7: removeRoom(); break;
-                case 8: viewSeatMap(); break;
-                case 9: changeSeatType(); break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(9);
+            try {
+                switch (choice) {
+                    case 1: viewAll(); break;
+                    case 2: addBranch(); break;
+                    case 3: editBranch(); break;
+                    case 4: removeBranch(); break;
+                    case 5: addRoom(); break;
+                    case 6: renameRoom(); break;
+                    case 7: removeRoom(); break;
+                    case 8: viewSeatMap(); break;
+                    case 9: changeSeatType(); break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Venues");
             }
         }
     }
@@ -69,14 +75,16 @@ public class VenueMenu {
         int roomCount = 0;
         int seatCount = 0;
         for (CinemaBranch b : venueManager.getBranches()) {
-            System.out.println("  " + b.getBranchId() + "  " + b.getBranchName() + "  (" + b.getLocation() + ")");
+            // long names and locations are cut with "..." so every line fits the screen
+            System.out.println("  " + b.getBranchId() + "  "
+                    + Format.shorten(b.getBranchName() + "  (" + b.getLocation() + ")", 64));
             if (b.getRooms().isEmpty()) {
-                System.out.println("      (no rooms yet)");
+                System.out.println("    (no rooms yet)");
             }
             for (CinemaRoom r : b.getRooms()) {
-                System.out.println(String.format("      %-6s %-14s %2d x %-2d  %3d seats (%d VIP)   %d upcoming show(s)",
-                        r.getRoomId(), r.getRoomName(), r.getRows(), r.getSeatsPerRow(),
-                        r.getSeats().size(), r.getVipSeatCount(), countUpcomingShows(r)));
+                System.out.println("    " + Format.fit(r.getRoomId(), 6) + " " + Format.fit(r.getRoomName(), 14)
+                        + String.format(" %2d x %-2d  %3d seats (%d VIP)  %d upcoming show(s)", r.getRows(),
+                        r.getSeatsPerRow(), r.getSeats().size(), r.getVipSeatCount(), countUpcomingShows(r)));
                 roomCount++;
             }
             seatCount += b.getTotalSeats();
@@ -88,8 +96,10 @@ public class VenueMenu {
 
     private void addBranch() {
         Screen.section("ADD A BRANCH");
-        String name = ConsoleReader.readLine("Branch name: ");
-        String location = ConsoleReader.readLine("Location: ");
+        String name = askBranchName("Branch name (blank to cancel): ", null);
+        if (name == null) return;
+        String location = askLocation("Location (blank to cancel): ");
+        if (location == null) return;
         try {
             CinemaBranch branch = venueManager.createBranch(name, location);
             Screen.success("Branch added with ID " + branch.getBranchId() + ".");
@@ -106,16 +116,18 @@ public class VenueMenu {
         Screen.option(1, "Change name");
         Screen.option(2, "Change location");
         Screen.option(0, "Cancel");
-        int choice = Screen.readChoice();
+        int choice = Screen.readChoice(2);
         try {
             if (choice == 1) {
-                venueManager.renameBranch(branch, ConsoleReader.readLine("New branch name: "));
+                String name = askBranchName("New branch name (blank to cancel): ", branch);
+                if (name == null) return;
+                venueManager.renameBranch(branch, name);
                 Screen.success("Branch renamed to " + branch.getBranchName() + ".");
             } else if (choice == 2) {
-                branch.setLocation(ConsoleReader.readLine("New location: "));
+                String location = askLocation("New location (blank to cancel): ");
+                if (location == null) return;
+                branch.setLocation(location);
                 Screen.success("Location updated.");
-            } else if (choice != 0) {
-                Screen.error("Invalid choice.");
             }
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
@@ -147,11 +159,19 @@ public class VenueMenu {
         }
         CinemaBranch branch = chooseBranch();
         if (branch == null) return;
-        String name = ConsoleReader.readLine("Room name: ");
-        int rows = ConsoleReader.readInt("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS + "): ");
-        int perRow = ConsoleReader.readInt("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
-                + VenueManager.MAX_SEATS_PER_ROW + "): ");
+        // each answer is checked right after it is typed, and asked again if it is wrong
+        String name = askRoomName("Room name (blank to cancel): ", branch, null);
+        if (name == null) return;
+        int rows = ConsoleReader.readNumber("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS
+                + ", lettered A-Z): ", "Rows", VenueManager.MIN_ROWS, VenueManager.MAX_ROWS);
+        int perRow = ConsoleReader.readNumber("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
+                + VenueManager.MAX_SEATS_PER_ROW + "): ", "Seats per row",
+                VenueManager.MIN_SEATS_PER_ROW, VenueManager.MAX_SEATS_PER_ROW);
         SeatLayoutStrategy layout = chooseLayout();
+        if (layout == null) {
+            Screen.info("Cancelled. No room was added.");
+            return;
+        }
         try {
             CinemaRoom room = venueManager.addRoomToBranch(branch.getBranchId(), name, rows, perRow, layout);
             Screen.success("Room added with ID " + room.getRoomId() + " (" + room.getSeats().size()
@@ -162,17 +182,17 @@ public class VenueMenu {
         }
     }
 
-    // STRATEGY PATTERN: the admin picks how the VIP seats are arranged
+    // STRATEGY PATTERN: the admin picks how the VIP seats are arranged. Returns null if cancelled.
     private SeatLayoutStrategy chooseLayout() {
         SeatLayoutStrategy[] layouts = { new StandardLayout(), new PremiumLayout(), new EconomyLayout() };
         Screen.section("SEAT LAYOUT");
         for (int i = 0; i < layouts.length; i++) {
             Screen.option(i + 1, layouts[i].getName());
         }
-        int choice = Screen.readChoice();
-        if (choice < 1 || choice > layouts.length) {
-            Screen.info("Using the Standard layout.");
-            return layouts[0];
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice(layouts.length);
+        if (choice == 0) {
+            return null;
         }
         return layouts[choice - 1];
     }
@@ -180,8 +200,10 @@ public class VenueMenu {
     private void renameRoom() {
         CinemaRoom room = chooseRoom();
         if (room == null) return;
+        String name = askRoomName("New room name (blank to cancel): ", venueManager.findBranchOfRoom(room), room);
+        if (name == null) return;
         try {
-            venueManager.renameRoom(room, ConsoleReader.readLine("New room name: "));
+            venueManager.renameRoom(room, name);
             Screen.success("Room renamed to " + room.getRoomName() + ".");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
@@ -215,21 +237,21 @@ public class VenueMenu {
         CinemaRoom room = chooseRoom();
         if (room == null) return;
         printSeatMap(room);
-        String seatId = ConsoleReader.readLine("Seat to change (e.g. A1): ");
-        if (room.findSeat(seatId) == null) {
-            Screen.error("Seat " + seatId.toUpperCase() + " does not exist in this room.");
-            return;
-        }
+        String seatId = askSeatToChange(room);
+        if (seatId == null) return;
+        Seat seat = room.findSeat(seatId);
+        Screen.info("Seat " + seat.getSeatNumber() + " is currently " + seat.getSeatType() + ".");
         Screen.option(1, "Standard seat");
         Screen.option(2, "VIP seat (+" + Format.peso(VipSeat.EXTRA_CHARGE) + ")");
-        int choice = Screen.readChoice();
-        if (choice != 1 && choice != 2) {
-            Screen.error("Invalid choice.");
+        Screen.option(0, "Cancel");
+        int choice = Screen.readChoice(2);
+        if (choice == 0) {
+            Screen.info("Cancelled. The seat was not changed.");
             return;
         }
         try {
             venueManager.changeSeatType(room, seatId, choice == 2, movieManager.getShowtimes());
-            Seat seat = room.findSeat(seatId);
+            seat = room.findSeat(seatId);   // changing the type replaces the seat object
             Screen.success("Seat " + seat.getSeatNumber() + " is now " + seat.getSeatType() + ".");
             Screen.info("Bookings that were already made keep the price they paid.");
         } catch (ValidationException e) {
@@ -244,7 +266,75 @@ public class VenueMenu {
         SeatMap.print(room, null);
     }
 
-    // ---------- helpers ----------
+    // ---------- helpers: each answer is checked as soon as it is typed and asked again if wrong ----------
+    // (a blank answer cancels and returns null)
+
+    // ignore = the branch being renamed (it may keep its own name), or null for a new branch
+    private String askBranchName(String prompt, CinemaBranch ignore) {
+        while (true) {
+            String name = ConsoleReader.readLine(prompt);
+            if (name.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkBranchName(name, ignore);
+                return name;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    private String askLocation(String prompt) {
+        while (true) {
+            String location = ConsoleReader.readLine(prompt);
+            if (location.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                Validator.validateLocation(location);
+                return location;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // ignore = the room being renamed, or null for a new room
+    private String askRoomName(String prompt, CinemaBranch branch, CinemaRoom ignore) {
+        while (true) {
+            String name = ConsoleReader.readLine(prompt);
+            if (name.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkRoomName(branch, name, ignore);
+                return name;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // The seat must exist and must not be booked for a show that hasn't ended
+    private String askSeatToChange(CinemaRoom room) {
+        while (true) {
+            String seatId = ConsoleReader.readLine("Seat to change (e.g. A1, blank to cancel): ");
+            if (seatId.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                venueManager.checkSeatCanChange(room, seatId, movieManager.getShowtimes());
+                return seatId;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
 
     private CinemaBranch chooseBranch() {
         if (venueManager.getBranches().isEmpty()) {
@@ -254,18 +344,26 @@ public class VenueMenu {
         for (CinemaBranch b : venueManager.getBranches()) {
             System.out.println("  " + b.getBranchId() + "  " + b.getBranchName());
         }
-        CinemaBranch branch = venueManager.findBranch(ConsoleReader.readLine("Branch ID: "));
-        if (branch == null) {
-            Screen.error("Branch not found.");
+        while (true) {
+            String id = ConsoleReader.readLine("Branch ID (blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            CinemaBranch branch = venueManager.findBranch(id);
+            if (branch != null) {
+                return branch;
+            }
+            Screen.error("No branch with the ID " + id.toUpperCase() + ". Please try again.");
         }
-        return branch;
     }
 
     private CinemaRoom chooseRoom() {
         boolean anyRoom = false;
         for (CinemaBranch b : venueManager.getBranches()) {
             for (CinemaRoom r : b.getRooms()) {
-                System.out.println("  " + r.getRoomId() + "  " + b.getBranchName() + " - " + r.getRoomName());
+                System.out.println("  " + Format.fit(r.getRoomId(), 6) + "  "
+                        + Format.shorten(b.getBranchName() + " - " + r.getRoomName(), 65));
                 anyRoom = true;
             }
         }
@@ -273,11 +371,18 @@ public class VenueMenu {
             Screen.info("No rooms yet. Add a room first.");
             return null;
         }
-        CinemaRoom room = venueManager.findRoom(ConsoleReader.readLine("Room ID: "));
-        if (room == null) {
-            Screen.error("Room not found.");
+        while (true) {
+            String id = ConsoleReader.readLine("Room ID (blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            CinemaRoom room = venueManager.findRoom(id);
+            if (room != null) {
+                return room;
+            }
+            Screen.error("No room with the ID " + id.toUpperCase() + ". Please try again.");
         }
-        return room;
     }
 
     private int countUpcomingShows(CinemaRoom room) {

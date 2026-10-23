@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 
 import cinema.exception.LoginException;
+import cinema.exception.GoBackException;
 import cinema.exception.ValidationException;
 import cinema.model.Admin;
 import cinema.model.Customer;
@@ -45,7 +46,8 @@ public class AccountMenu {
         }
     }
 
-    // Returns the logged-in User, or null if login failed or was cancelled
+    // Returns the logged-in User, or null if login failed or was cancelled.
+    // The email (or username) is checked as soon as it is typed, then there are 3 tries for the password.
     public User login(boolean adminLogin) {
         if (adminLogin) {
             Screen.title("ADMIN LOGIN");
@@ -53,27 +55,14 @@ public class AccountMenu {
             Screen.title("CUSTOMER LOGIN");
         }
         Screen.info("Leave it blank to go back.");
+        User account = askLoginAccount(adminLogin);
+        if (account == null) return null;
 
         for (int attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
-            String emailOrUsername;
-            if (adminLogin) {
-                emailOrUsername = ConsoleReader.readLine("Username or email: ");
-            } else {
-                emailOrUsername = ConsoleReader.readLine("Email: ");
-            }
-            if (emailOrUsername.isEmpty()) return null;
             String password = ConsoleReader.readLine("Password: ");
+            if (password.isEmpty()) return null;
             try {
-                User user = userManager.login(emailOrUsername, password);
-                boolean isAdmin = user instanceof Admin;
-                if (adminLogin && !isAdmin) {
-                    Screen.error("This is not an admin account. Please use Customer Login.");
-                    return null;
-                }
-                if (!adminLogin && isAdmin) {
-                    Screen.error("Admins must use the Admin Login option.");
-                    return null;
-                }
+                User user = userManager.login(account.getEmail(), password);
                 Screen.success("Welcome, " + user.getName() + "!");
                 return user;
             } catch (LoginException e) {
@@ -89,6 +78,46 @@ public class AccountMenu {
         }
         Screen.error("Too many failed attempts. Returning to the main menu.");
         return null;
+    }
+
+    // Asks until the email (or admin username) belongs to an account that can log in on this screen.
+    // Returns null if the user leaves it blank.
+    private User askLoginAccount(boolean adminLogin) {
+        while (true) {
+            String text;
+            if (adminLogin) {
+                text = ConsoleReader.readLine("Username or email: ");
+            } else {
+                text = ConsoleReader.readLine("Email: ");
+            }
+            if (text.isEmpty()) return null;
+            try {
+                if (!adminLogin || text.contains("@")) {
+                    Validator.validateEmail(text);
+                } else {
+                    Validator.validateUsername(text);
+                }
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+                continue;
+            }
+            User account = userManager.findByLogin(text);
+            if (account == null) {
+                Screen.error("No account found with that " + (adminLogin ? "username or email" : "email")
+                        + ". Please check it, or register first.");
+            } else if (adminLogin && !(account instanceof Admin)) {
+                Screen.error("This is not an admin account. Please use Customer Login.");
+            } else if (!adminLogin && account instanceof Admin) {
+                Screen.error("Admins must use the Admin Login option.");
+            } else if (account.isLocked()) {
+                Screen.error("Too many wrong passwords. This account is locked until "
+                        + Format.shortDateTime(account.getLockedUntil()) + ".");
+            } else if (!account.isActive()) {
+                Screen.error("This account has been deactivated. Please contact an admin.");
+            } else {
+                return account;
+            }
+        }
     }
 
     // ---------- my profile (customer or admin) ----------
@@ -117,22 +146,26 @@ public class AccountMenu {
             if (user instanceof Customer) {
                 Screen.info("To correct your birthdate, please ask an admin (bring a valid ID).");
             }
-            int choice = Screen.readChoice();
-            switch (choice) {
-                case 1:
-                    editName(user);
-                    break;
-                case 2:
-                    editEmail(user);
-                    break;
-                case 3:
-                    changePassword(user);
-                    break;
-                case 0:
-                    back = true;
-                    break;
-                default:
-                    Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(3);
+            try {
+                switch (choice) {
+                    case 1:
+                        editName(user);
+                        break;
+                    case 2:
+                        editEmail(user);
+                        break;
+                    case 3:
+                        changePassword(user);
+                        break;
+                    case 0:
+                        back = true;
+                        break;
+                    default:
+                        Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("My Profile");
             }
         }
     }
@@ -160,8 +193,22 @@ public class AccountMenu {
     }
 
     private void changePassword(User user) {
-        if (!user.checkPassword(ConsoleReader.readLine("Current password: "))) {
-            Screen.error("Current password is incorrect.");
+        // the current password is checked as soon as it is typed (3 tries)
+        boolean confirmed = false;
+        for (int attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS && !confirmed; attempt++) {
+            String current = ConsoleReader.readLine("Current password (blank to cancel): ");
+            if (current.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            if (user.checkPassword(current)) {
+                confirmed = true;
+            } else {
+                Screen.error("Current password is incorrect.");
+            }
+        }
+        if (!confirmed) {
+            Screen.error("Too many wrong tries. Your password was not changed.");
             return;
         }
         String password = askNewPassword("New password");
@@ -189,63 +236,64 @@ public class AccountMenu {
             Screen.option(7, "Correct a customer's birthdate (check their ID)");
             Screen.option(8, "Create an admin account");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
-            switch (choice) {
-                case 1:
-                    listAllAccounts();
-                    break;
-                case 2:
-                    searchCustomers();
-                    break;
-                case 3:
-                    changeCustomerStatus(false);
-                    break;
-                case 4:
-                    changeCustomerStatus(true);
-                    break;
-                case 5:
-                    unlockAccount();
-                    break;
-                case 6:
-                    resetCustomerPassword();
-                    break;
-                case 7:
-                    correctBirthDate();
-                    break;
-                case 8:
-                    createAdmin();
-                    break;
-                case 0:
-                    back = true;
-                    break;
-                default:
-                    Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(8);
+            try {
+                switch (choice) {
+                    case 1:
+                        listAllAccounts();
+                        break;
+                    case 2:
+                        searchCustomers();
+                        break;
+                    case 3:
+                        changeCustomerStatus(false);
+                        break;
+                    case 4:
+                        changeCustomerStatus(true);
+                        break;
+                    case 5:
+                        unlockAccount();
+                        break;
+                    case 6:
+                        resetCustomerPassword();
+                        break;
+                    case 7:
+                        correctBirthDate();
+                        break;
+                    case 8:
+                        createAdmin();
+                        break;
+                    case 0:
+                        back = true;
+                        break;
+                    default:
+                        Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Accounts");
             }
         }
     }
 
     private void listAllAccounts() {
         Screen.section("ALL ACCOUNTS");
-        printTableHeader();
-        for (User user : userManager.getAllUsers()) {
-            // Admin and Customer each describe themselves (POLYMORPHISM)
-            System.out.println("  " + user.getDetails());
-        }
+        printAccounts(userManager.getAllUsers());
         System.out.println("  Total: " + userManager.getAllUsers().size() + " account(s)");
     }
 
     private void searchCustomers() {
-        String keyword = ConsoleReader.readLine("Search name or email: ");
+        String keyword = ConsoleReader.readLine("Search name or email (blank to cancel): ");
+        if (keyword.isEmpty()) {
+            Screen.info("Cancelled.");
+            return;
+        }
         ArrayList<Customer> found = userManager.searchCustomers(keyword);
         if (found.isEmpty()) {
             Screen.info("No customers found.");
             return;
         }
         Screen.section("SEARCH RESULTS");
-        printTableHeader();
-        for (Customer customer : found) {
-            System.out.println("  " + customer.getDetails());
-        }
+        printAccounts(new ArrayList<User>(found));
     }
 
     private void changeCustomerStatus(boolean active) {
@@ -260,10 +308,17 @@ public class AccountMenu {
     }
 
     private void unlockAccount() {
-        User user = userManager.findUser(ConsoleReader.readLine("Account ID (e.g. U-2): "));
-        if (user == null) {
-            Screen.error("No account with that ID.");
-            return;
+        User user = null;
+        while (user == null) {   // asked again until the ID belongs to an account
+            String id = ConsoleReader.readLine("Account ID (e.g. U-2, blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            user = userManager.findUser(id);
+            if (user == null) {
+                Screen.error("No account with the ID " + id.toUpperCase() + ". Please try again.");
+            }
         }
         if (!user.isLocked()) {
             Screen.info(user.getName() + "'s account is not locked.");
@@ -320,18 +375,30 @@ public class AccountMenu {
         }
     }
 
+    // Asks until the ID belongs to a customer. Returns null if the admin leaves it blank.
     private Customer chooseCustomer() {
-        String id = ConsoleReader.readLine("Customer ID (e.g. U-2): ");
-        Customer customer = userManager.findCustomer(id);
-        if (customer == null) {
-            Screen.error("No customer with that ID.");
+        while (true) {
+            String id = ConsoleReader.readLine("Customer ID (e.g. U-2, blank to cancel): ");
+            if (id.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            Customer customer = userManager.findCustomer(id);
+            if (customer != null) {
+                return customer;
+            }
+            Screen.error("No customer with the ID " + id.toUpperCase() + ". Please try again.");
         }
-        return customer;
     }
 
-    private void printTableHeader() {
-        System.out.println("  " + String.format(User.TABLE_FORMAT, "ID", "NAME", "EMAIL", "ROLE", "STATUS") + "AGE");
-        Screen.line();
+    // The accounts table, also used by RecordsMenu. A name or email that is too long ends with "...".
+    public static void printAccounts(ArrayList<User> users) {
+        Table table = new Table(6, 16, 19, 8, 11, 3);
+        table.printHeader("ID", "NAME", "EMAIL", "ROLE", "STATUS", "AGE");
+        for (User user : users) {
+            // Admin and Customer each give their own row (POLYMORPHISM)
+            table.printRow(user.getTableRow());
+        }
     }
 
     private String statusText(boolean active) {

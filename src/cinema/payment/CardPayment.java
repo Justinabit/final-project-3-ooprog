@@ -7,14 +7,40 @@ import cinema.util.ConsoleReader;
 import cinema.util.Format;
 
 // [Member D] Pay with a Visa or Mastercard credit/debit card.
-// Checks the card number (Luhn checksum), the expiry date and the CVV like a real payment page.
+// Checks the card number (Luhn checksum), the expiry date and the CVV like a real payment page:
+// each one as soon as it is typed, asking again until it is right.
 public class CardPayment implements PaymentStrategy {
     public String getDisplayName() { return "Credit/Debit Card"; }
 
     public void pay(double amount) throws PaymentException {
         PaymentStrategy.validateAmount(amount);
         System.out.println("  (Demo test card: 4111 1111 1111 1111, any future expiry, any 3-digit CVV)");
-        String cardNumber = ConsoleReader.readLine("Card number (16 digits): ").replaceAll("[ -]", "");
+        String cardNumber;
+        while (true) {
+            cardNumber = ConsoleReader.readLine("Card number (16 digits): ").replaceAll("[ -]", "");
+            try {
+                checkCardNumber(cardNumber);
+                break;
+            } catch (PaymentException e) {
+                System.out.println("  [ !! ] " + e.getMessage());
+            }
+        }
+        while (true) {
+            try {
+                checkExpiry(ConsoleReader.readLine("Expiry date (MM/YY): "));
+                break;
+            } catch (PaymentException e) {
+                System.out.println("  [ !! ] " + e.getMessage());
+            }
+        }
+        // The CVV is only checked here; it is never printed or saved.
+        while (!ConsoleReader.readLine("CVV (3 digits on the back): ").matches("\\d{3}")) {
+            System.out.println("  [ !! ] Invalid CVV. It must be 3 digits.");
+        }
+        System.out.println("  Paid " + Format.peso(amount) + " by card ending in " + cardNumber.substring(12) + ".");
+    }
+
+    private void checkCardNumber(String cardNumber) throws PaymentException {
         if (!cardNumber.matches("\\d{16}")) {
             throw new PaymentException("Invalid card number. It must contain exactly 16 digits.");
         }
@@ -24,13 +50,6 @@ public class CardPayment implements PaymentStrategy {
         if (!passesLuhnCheck(cardNumber)) {
             throw new PaymentException("Invalid card number. Please check the digits.");
         }
-        checkExpiry(ConsoleReader.readLine("Expiry date (MM/YY): "));
-        String cvv = ConsoleReader.readLine("CVV (3 digits on the back): ");
-        if (!cvv.matches("\\d{3}")) {
-            throw new PaymentException("Invalid CVV. It must be 3 digits.");
-        }
-        // The CVV is only checked here; it is never printed or saved.
-        System.out.println("  Paid " + Format.peso(amount) + " by card ending in " + cardNumber.substring(12) + ".");
     }
 
     // Luhn check: the checksum every real card number passes. Going from the right, double every second

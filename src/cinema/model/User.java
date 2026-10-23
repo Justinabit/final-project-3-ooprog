@@ -7,8 +7,6 @@ import cinema.util.Validator;
 
 // [Member A] Abstract parent class for Admin and Customer (INHERITANCE + ABSTRACTION)
 public abstract class User {
-    // Column layout for the accounts table (ID, NAME, EMAIL, ROLE, STATUS)
-    public static final String TABLE_FORMAT = "%-5s %-18s %-22s %-9s %-12s";
     public static final int MAX_FAILED_LOGINS = 5;   // wrong passwords in a row before the account locks
     public static final int LOCK_MINUTES = 15;
 
@@ -115,8 +113,10 @@ public abstract class User {
         return "ACTIVE";
     }
 
-    // One row of the accounts table. Customer overrides this to add the age (POLYMORPHISM).
-    public String getDetails() {
-        return String.format(TABLE_FORMAT, userId, name, email, getRole(), getStatus());
+    // One row of the accounts table: ID, NAME, EMAIL, ROLE, STATUS, AGE.
+    // An admin has no age, so it is left blank. Customer overrides this to fill it in (POLYMORPHISM).
+    public String[] getTableRow() {
+        String[] row = { userId, name, email, getRole(), getStatus(), "" };
+        return row;
     }
 }

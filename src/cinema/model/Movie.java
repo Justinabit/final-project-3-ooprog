@@ -5,9 +5,6 @@ import cinema.util.Validator;
 
 // [Member B] A movie in the catalog
 public class Movie {
-    // Column layout for movie tables (ID, TITLE, GENRE, RATING, RUNTIME, STATUS)
-    public static final String TABLE_FORMAT = "%-5s %-28s %-9s %-5s %-7s %s";
-
     private String movieId;
     private String title;
     private String genre;
@@ -49,7 +46,7 @@ public class Movie {
     }
 
     public void setDurationMinutes(int durationMinutes) throws ValidationException {
-        Validator.validateRange("Duration (minutes)", durationMinutes, 1, 600);
+        Validator.validateRange("Duration (minutes)", durationMinutes, 1, Validator.MAX_DURATION_MINUTES);
         this.durationMinutes = durationMinutes;
     }
 
@@ -86,12 +83,9 @@ public class Movie {
         return age >= getMinimumAge();
     }
 
+    // -> "M-1  Spider-Man: Brand New Day (Superhero, PG, 2h 20m, NOW SHOWING)"
     @Override
     public String toString() {
-        String shownTitle = title;
-        if (shownTitle.length() > 28) {
-            shownTitle = shownTitle.substring(0, 25) + "...";   // keep the table columns lined up
-        }
-        return String.format(TABLE_FORMAT, movieId, shownTitle, genre, ageRating, getRuntime(), status);
+        return movieId + "  " + title + " (" + genre + ", " + ageRating + ", " + getRuntime() + ", " + status + ")";
     }
 }

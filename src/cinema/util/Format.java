@@ -36,4 +36,38 @@ public class Format {
     public static String shortDateTime(LocalDateTime time) {
         return time.format(SHORT_DATE_TIME);
     }
+
+    // ---------- fitting text into table columns ----------
+
+    // Makes text exactly `width` characters: short text gets spaces after it, long text is cut and ends
+    // with "..." so it never pushes the next column. fit("Ma. Cristina Dela Cruz", 16) -> "Ma. Cristina... "
+    public static String fit(String text, int width) {
+        String cut = shorten(text, width);
+        return cut + spaces(width - cut.length());
+    }
+
+    // Same as fit, but the spaces go first (for numbers and money, so they line up on the right)
+    public static String fitRight(String text, int width) {
+        String cut = shorten(text, width);
+        return spaces(width - cut.length()) + cut;
+    }
+
+    // Cuts text to at most `width` characters, ending with "..." when something was cut (no padding)
+    public static String shorten(String text, int width) {
+        if (text.length() <= width) {
+            return text;
+        }
+        if (width <= 3) {
+            return text.substring(0, width);
+        }
+        return text.substring(0, width - 3).trim() + "...";   // "Ma. Cristina ..." -> "Ma. Cristina..."
+    }
+
+    private static String spaces(int count) {
+        String result = "";
+        for (int i = 0; i < count; i++) {
+            result += " ";
+        }
+        return result;
+    }
 }

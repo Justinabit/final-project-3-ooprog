@@ -1,6 +1,8 @@
 package cinema.ui;
 
+import cinema.exception.GoBackException;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
 // Shared look for every screen: the welcome banner, titles, menu options and messages.
 // All menus call these methods so the whole program has the same design.
@@ -40,7 +42,13 @@ public class Screen {
         filmStrip();
         border();
         System.out.println();
-        ConsoleReader.readLine(spaces(23) + "Press Enter to continue...");
+        System.out.println(spaces(5) + "Tip: type " + ConsoleReader.RETURN_COMMAND
+                + " at any prompt to go back to the previous screen.");
+        try {
+            ConsoleReader.readLine(spaces(23) + "Press Enter to continue...");
+        } catch (GoBackException e) {
+            // nothing to go back to from the welcome screen
+        }
     }
 
     public static void showGoodbye() {
@@ -63,6 +71,7 @@ public class Screen {
 
     // Smaller heading inside a screen, for example "SUMMARY"
     public static void section(String text) {
+        text = Format.shorten(text, WIDTH - 9);   // a long movie title or name ends with "..."
         System.out.println();
         System.out.println(" --- " + text + " " + repeat("-", WIDTH - 5 - text.length()));
     }
@@ -76,10 +85,25 @@ public class Screen {
         System.out.println("  " + label + "  " + text);
     }
 
-    // Prints the bottom line of a menu and reads the user's choice
-    public static int readChoice() {
+    // Prints the bottom line of a menu and reads the user's choice (0 to max, exactly as shown).
+    // Typing /return throws GoBackException (used inside a task, e.g. a booking step).
+    public static int readChoice(int max) {
         line();
-        return ConsoleReader.readInt("Enter your choice: ");
+        return ConsoleReader.readChoice("Enter your choice (" + ConsoleReader.RETURN_COMMAND + " = go back): ", max);
+    }
+
+    // For menus whose option 0 is "Back": typing /return there simply means 0 (Back).
+    public static int readMenuChoice(int max) {
+        try {
+            return readChoice(max);
+        } catch (GoBackException e) {
+            return 0;
+        }
+    }
+
+    // Shown when /return brought the user back to a menu
+    public static void backTo(String screenName) {
+        info("Back to " + screenName + ".");
     }
 
     public static void line() {
@@ -110,13 +134,10 @@ public class Screen {
         System.out.println(" |" + repeat("-", WIDTH - 2) + "|");
     }
 
-    // Prints text on the left side between two "|" walls (long text is cut off)
+    // Prints text on the left side between two "|" walls (long text is cut and ends with "...")
     public static void boxLeft(String text) {
-        int inside = WIDTH - 4;
-        if (text.length() > inside) {
-            text = text.substring(0, inside);
-        }
-        System.out.println(" |  " + text + spaces(inside - text.length()) + "|");
+        int inside = WIDTH - 5;
+        System.out.println(" |  " + Format.fit(text, inside) + " |");
     }
 
     // ---------- small helpers ----------

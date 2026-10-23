@@ -39,11 +39,8 @@ public class VenueManager {
 
     // Convenience for the menu: checks everything first, so an ID is only used when the branch is really added
     public CinemaBranch createBranch(String name, String location) throws ValidationException {
-        Validator.validateBranchName(name);
+        checkBranchName(name, null);
         Validator.validateLocation(location);
-        if (isBranchNameTaken(name, null)) {
-            throw new ValidationException("A branch named '" + name.trim() + "' already exists.");
-        }
         CinemaBranch branch = new CinemaBranch(nextBranchId(), name, location);
         branches.add(branch);
         return branch;
@@ -51,11 +48,17 @@ public class VenueManager {
 
     // Branch names must stay unique when renaming too
     public void renameBranch(CinemaBranch branch, String newName) throws ValidationException {
-        Validator.validateBranchName(newName);
-        if (isBranchNameTaken(newName, branch)) {
-            throw new ValidationException("A branch named '" + newName.trim() + "' already exists.");
-        }
+        checkBranchName(newName, branch);
         branch.setBranchName(newName);
+    }
+
+    // A branch name must be valid and not used by another branch. The menu calls this right after the
+    // name is typed. ignore = the branch being renamed (it may keep its own name), or null for a new one.
+    public void checkBranchName(String name, CinemaBranch ignore) throws ValidationException {
+        Validator.validateBranchName(name);
+        if (isBranchNameTaken(name, ignore)) {
+            throw new ValidationException("A branch named '" + name.trim() + "' already exists.");
+        }
     }
 
     // ignore = the branch being renamed (it may keep its own name), or null
@@ -93,10 +96,7 @@ public class VenueManager {
         if (branch == null) {
             throw new VenueException("Branch " + branchId + " not found.");
         }
-        Validator.validateRoomName(roomName);
-        if (branch.hasRoomNamed(roomName, null)) {
-            throw new ValidationException("A room named '" + roomName.trim() + "' already exists in this branch.");
-        }
+        checkRoomName(branch, roomName, null);
         Validator.validateRange("Rows", rows, MIN_ROWS, MAX_ROWS);
         Validator.validateRange("Seats per row", seatsPerRow, MIN_SEATS_PER_ROW, MAX_SEATS_PER_ROW);
         CinemaRoom room = new CinemaRoom(nextRoomId(), roomName);
@@ -114,26 +114,40 @@ public class VenueManager {
         }
     }
 
-    // A seat that is booked for a show that hasn't ended can't change type (the ticket says what it is)
     public void changeSeatType(CinemaRoom room, String seatId, boolean makeVip, ArrayList<Showtime> showtimes)
             throws ValidationException {
+        checkSeatCanChange(room, seatId, showtimes);
+        room.changeSeatType(seatId, makeVip);
+    }
+
+    // A seat that is booked for a show that hasn't ended can't change type (the ticket says what it is).
+    // The menu calls this right after the seat is typed.
+    public void checkSeatCanChange(CinemaRoom room, String seatId, ArrayList<Showtime> showtimes)
+            throws ValidationException {
+        if (room.findSeat(seatId) == null) {
+            throw new ValidationException("Seat " + seatId.trim().toUpperCase() + " does not exist in this room.");
+        }
         for (Showtime s : showtimes) {
             if (s.getRoom() == room && !s.isCancelled() && !s.hasEnded() && s.isSeatTaken(seatId.trim())) {
                 throw new ValidationException("Seat " + seatId.trim().toUpperCase() + " is booked for the "
                         + s.getDateTime() + " show. Change it after that show has ended.");
             }
         }
-        room.changeSeatType(seatId, makeVip);
     }
 
     // Room names must stay unique inside a branch
     public void renameRoom(CinemaRoom room, String newName) throws ValidationException {
-        Validator.validateRoomName(newName);
-        CinemaBranch branch = findBranchOfRoom(room);
-        if (branch != null && branch.hasRoomNamed(newName, room)) {
-            throw new ValidationException("A room named '" + newName.trim() + "' already exists in this branch.");
-        }
+        checkRoomName(findBranchOfRoom(room), newName, room);
         room.setRoomName(newName);
+    }
+
+    // A room name must be valid and not used by another room in the same branch. The menu calls this
+    // right after the name is typed. ignore = the room being renamed, or null for a new room.
+    public void checkRoomName(CinemaBranch branch, String name, CinemaRoom ignore) throws ValidationException {
+        Validator.validateRoomName(name);
+        if (branch != null && branch.hasRoomNamed(name, ignore)) {
+            throw new ValidationException("A room named '" + name.trim() + "' already exists in this branch.");
+        }
     }
 
     // Same rule as removing a movie: not allowed once a showtime in this room has bookings

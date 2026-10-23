@@ -10,6 +10,7 @@ import cinema.discount.PwdDiscount;
 import cinema.discount.SeniorDiscount;
 import cinema.discount.StudentDiscount;
 import cinema.exception.BookingException;
+import cinema.exception.GoBackException;
 import cinema.exception.PaymentException;
 import cinema.exception.ValidationException;
 import cinema.model.Booking;
@@ -53,72 +54,109 @@ public class BookingMenu {
 
     // ---------- customer: book a ticket ----------
 
+    // The booking goes through numbered steps. Typing /return at any prompt goes back ONE step
+    // (and from step 1 back to the customer menu). 0 or a blank line cancels the booking.
     public void bookTicket(Customer customer) {
         Screen.title("BOOK A TICKET");
+        Screen.info("Type " + ConsoleReader.RETURN_COMMAND + " at any prompt to go back one step.");
+        Movie movie = null;
+        Showtime showtime = null;
+        ArrayList<Seat> seats = null;
+        ArrayList<Ticket> tickets = null;
+        DiscountStrategy discount = null;
+        PaymentStrategy payment = null;
+        double total = 0;
 
-        // STEP 1: movie
-        Movie movie = chooseMovie(customer);
-        if (movie == null) return;
+        int step = 1;
+        while (true) {
+            try {
+                if (step == 1) {
+                    movie = chooseMovie(customer);
+                    if (movie == null) return;
+                } else if (step == 2) {
+                    showtime = chooseShowtime(movie);
+                    if (showtime == null) return;
+                } else if (step == 3) {
+                    Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
+                    System.out.println("  " + Format.shorten(movie.getTitle(), 73));
+                    System.out.println("  " + Format.shorten(cinemaName(showtime), 42) + "  |  "
+                            + Format.dateTime(showtime.getStart()));
+                    SeatMap.print(showtime.getRoom(), showtime);
+                    seats = chooseSeats(showtime);
+                    if (seats == null) return;
+                } else if (step == 4) {
+                    Screen.section("STEP 4 OF 5: TICKET TYPE AND DISCOUNT");
+                    tickets = chooseTickets(showtime, seats);
+                    if (tickets == null) return;
+                    discount = chooseDiscountFor(customer, tickets);
+                    if (discount == null) return;
+                } else if (step == 5) {
+                    Screen.section("STEP 5 OF 5: REVIEW AND PAY");
+                    total = printOrderSummary(showtime, tickets, discount);
+                    payment = choosePayment();
+                    if (payment == null) return;
+                } else {
+                    if (!ConsoleReader.readYesNo("Confirm and pay " + Format.peso(total) + " with "
+                            + payment.getDisplayName() + "? (y/n): ")) {
+                        Screen.info("Booking cancelled. Nothing was charged.");
+                        return;
+                    }
+                    payAndConfirm(customer, showtime, tickets, discount, payment, total);
+                    return;
+                }
+                step++;
+            } catch (GoBackException e) {
+                step--;
+                if (step < 1) {
+                    Screen.backTo("the customer menu");
+                    return;
+                }
+                Screen.info("Going back one step.");
+            }
+        }
+    }
 
-        // STEP 2: schedule
-        Showtime showtime = chooseShowtime(movie);
-        if (showtime == null) return;
-
-        // STEP 3: seats
-        Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
-        System.out.println("  " + movie.getTitle() + "  |  " + cinemaName(showtime) + "  |  "
-                + Format.dateTime(showtime.getStart()));
-        SeatMap.print(showtime.getRoom(), showtime);
-        ArrayList<Seat> seats = chooseSeats(showtime);
-        if (seats == null) return;
-
-        // STEP 4: ticket type and discount
-        Screen.section("STEP 4 OF 5: TICKET TYPE AND DISCOUNT");
+    // STEP 4a: Regular or Student tickets for every seat. Returns null if the booking is cancelled.
+    private ArrayList<Ticket> chooseTickets(Showtime showtime, ArrayList<Seat> seats) {
         System.out.println("  Ticket type:");
         Screen.option(1, "Regular");
         Screen.option(2, "Student (20% off, valid school ID required)");
         Screen.option(0, "Cancel booking");
-        int ticketType = readOption(2);
+        int ticketType = Screen.readChoice(2);
         if (ticketType == 0) {
             Screen.info("Booking cancelled.");
-            return;
+            return null;
         }
-        boolean student = ticketType == 2;
         ArrayList<Ticket> tickets = new ArrayList<>();
         for (Seat seat : seats) {
-            if (student) {
+            if (ticketType == 2) {
                 tickets.add(new StudentTicket(showtime, seat));
             } else {
                 tickets.add(new RegularTicket(showtime, seat));
             }
         }
-        DiscountStrategy discount;
-        if (student) {
-            // One discount per booking: student tickets get the student discount and nothing else.
+        return tickets;
+    }
+
+    // STEP 4b: one discount per booking. Student tickets get the student discount and nothing else.
+    private DiscountStrategy chooseDiscountFor(Customer customer, ArrayList<Ticket> tickets) {
+        if (tickets.get(0) instanceof StudentTicket) {
             Screen.info("Note: " + tickets.get(0).getEligibilityNote());
             Screen.info("The student discount (" + StudentDiscount.PERCENT + "% off) cannot be combined with other discounts.");
-            discount = new StudentDiscount();
-        } else {
-            discount = chooseDiscount(customer);
-            if (discount == null) {
-                Screen.info("Booking cancelled.");
-                return;
-            }
+            return new StudentDiscount();
         }
-
-        // STEP 5: review and pay
-        Screen.section("STEP 5 OF 5: REVIEW AND PAY");
-        double total = printOrderSummary(showtime, tickets, discount);
-        PaymentStrategy payment = choosePayment();
-        if (payment == null) return;
-        if (!ConsoleReader.readYesNo("Confirm and pay " + Format.peso(total) + " with " + payment.getDisplayName() + "? (y/n): ")) {
-            Screen.info("Booking cancelled. Nothing was charged.");
-            return;
+        DiscountStrategy discount = chooseDiscount(customer);
+        if (discount == null) {
+            Screen.info("Booking cancelled.");
         }
+        return discount;
+    }
 
-        // Hold the seats first, then take the payment. If ANYTHING stops us before the payment is saved
-        // (a failed payment, a price mismatch, an unexpected error), the finally block releases the seats
-        // and forgets the booking, so an unpaid booking can never stay in the system.
+    // STEP 6: hold the seats first, then take the payment. If ANYTHING stops us before the payment is saved
+    // (a failed payment, a price mismatch, /return, an unexpected error), the finally block releases the seats
+    // and forgets the booking, so an unpaid booking can never stay in the system.
+    private void payAndConfirm(Customer customer, Showtime showtime, ArrayList<Ticket> tickets,
+            DiscountStrategy discount, PaymentStrategy payment, double total) {
         Booking booking = null;
         boolean paid = false;
         try {
@@ -163,12 +201,12 @@ public class BookingMenu {
         Screen.section("STEP 1 OF 5: CHOOSE A MOVIE");
         for (int i = 0; i < movies.size(); i++) {
             Movie m = movies.get(i);
-            Screen.option(i + 1, String.format("%-28s %-9s %-5s %s", m.getTitle(), m.getGenre(),
-                    m.getAgeRating(), m.getRuntime()));
+            Screen.option(i + 1, Format.fit(m.getTitle(), 32) + "  " + Format.fit(m.getGenre(), 11) + "  "
+                    + Format.fit(m.getAgeRating(), 4) + "  " + m.getRuntime());
         }
         Screen.option(0, "Cancel");
         while (true) {
-            int choice = readOption(movies.size());
+            int choice = Screen.readChoice(movies.size());
             if (choice == 0) {
                 Screen.info("Booking cancelled.");
                 return null;
@@ -185,7 +223,8 @@ public class BookingMenu {
     // STEP 2: schedules grouped by branch, numbered in the order they are shown
     private Showtime chooseShowtime(Movie movie) {
         Screen.section("STEP 2 OF 5: CHOOSE A SCHEDULE");
-        System.out.println("  " + movie.getTitle() + "  (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
+        System.out.println("  " + Format.shorten(movie.getTitle(), 56) + "  (" + movie.getAgeRating() + ", "
+                + movie.getRuntime() + ")");
         ArrayList<Showtime> numbered = new ArrayList<>();
         for (CinemaBranch branch : venueManager.getBranches()) {
             boolean branchPrinted = false;
@@ -193,7 +232,7 @@ public class BookingMenu {
                 if (venueManager.findBranchOfRoom(s.getRoom()) != branch) continue;
                 if (!branchPrinted) {
                     System.out.println();
-                    System.out.println("  " + branch.getBranchName() + "  -  " + branch.getLocation());
+                    System.out.println("  " + Format.shorten(branch.getBranchName() + "  -  " + branch.getLocation(), 73));
                     branchPrinted = true;
                 }
                 numbered.add(s);
@@ -202,13 +241,13 @@ public class BookingMenu {
                     seatsLeft = "SOLD OUT";
                 }
                 Screen.option(numbered.size(), Format.shortDateTime(s.getStart()) + "   "
-                        + String.format("%-10s", s.getRoom().getRoomName()) + "   "
-                        + Format.peso(s.getBasePrice()) + "   " + seatsLeft);
+                        + Format.fit(s.getRoom().getRoomName(), 12) + "  "
+                        + Format.fitRight(Format.peso(s.getBasePrice()), 12) + "  " + seatsLeft);
             }
         }
         Screen.option(0, "Cancel");
         while (true) {
-            int choice = readOption(numbered.size());
+            int choice = Screen.readChoice(numbered.size());
             if (choice == 0) {
                 Screen.info("Booking cancelled.");
                 return null;
@@ -275,7 +314,7 @@ public class BookingMenu {
             Screen.option(3, "Senior citizen (20% off, age " + SeniorDiscount.MIN_AGE + "+)");
             Screen.option(4, "PWD (20% off, valid PWD ID required)");
             Screen.option(0, "Cancel booking");
-            int choice = readOption(4);
+            int choice = Screen.readChoice(4);
             if (choice == 0) {
                 return null;
             }
@@ -305,10 +344,15 @@ public class BookingMenu {
         }
     }
 
-    // Keeps asking until the code can be used. Blank goes back to the discount list (returns null).
+    // Keeps asking until the code can be used. Blank or /return goes back to the discount list (returns null).
     private Promo askPromoCode(Customer customer) {
         while (true) {
-            String code = ConsoleReader.readLine("Promo code (blank to go back): ");
+            String code;
+            try {
+                code = ConsoleReader.readLine("Promo code (blank or /return to go back): ");
+            } catch (GoBackException e) {
+                return null;
+            }
             if (code.isEmpty()) {
                 return null;
             }
@@ -325,10 +369,15 @@ public class BookingMenu {
         }
     }
 
-    // Keeps asking until the PWD ID looks right. Blank goes back to the discount list (returns null).
+    // Keeps asking until the PWD ID looks right. Blank or /return goes back to the discount list (returns null).
     private String askPwdId() {
         while (true) {
-            String id = ConsoleReader.readLine("PWD ID number (blank to go back): ");
+            String id;
+            try {
+                id = ConsoleReader.readLine("PWD ID number (blank or /return to go back): ");
+            } catch (GoBackException e) {
+                return null;
+            }
             if (id.isEmpty()) {
                 return null;
             }
@@ -344,26 +393,32 @@ public class BookingMenu {
     // STEP 5: receipt-style summary. Returns the total to pay.
     private double printOrderSummary(Showtime showtime, ArrayList<Ticket> tickets, DiscountStrategy discount) {
         Movie movie = showtime.getMovie();
-        System.out.println("  Movie    : " + movie.getTitle() + " (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
-        System.out.println("  Cinema   : " + cinemaName(showtime));
+        System.out.println("  Movie    : " + Format.shorten(movie.getTitle(), 45) + " (" + movie.getAgeRating() + ", "
+                + movie.getRuntime() + ")");
+        System.out.println("  Cinema   : " + Format.shorten(cinemaName(showtime), 62));
         System.out.println("  Schedule : " + Format.dateTime(showtime.getStart()));
         Screen.line();
         for (Ticket t : tickets) {
-            System.out.println(String.format("    %-6s %-10s %-22s %15s", t.getSeat().getSeatNumber(),
-                    t.getSeat().getSeatType(), t.getTicketType(),
-                    Format.peso(BookingManager.round2(t.calculatePrice()))));
+            System.out.println("    " + Format.fit(t.getSeat().getSeatNumber(), 6) + " "
+                    + Format.fit(t.getSeat().getSeatType(), 10) + " " + Format.fit(t.getTicketType(), 22) + " "
+                    + Format.fitRight(Format.peso(BookingManager.round2(t.calculatePrice())), 15));
         }
         double subtotal = BookingManager.calculateSubtotal(tickets);
         double total = BookingManager.calculateTotal(tickets, discount);
         Screen.line();
-        System.out.println(String.format("  %-42s %15s", "Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal)));
+        printSummaryLine("Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal));
         if (total < subtotal) {
-            System.out.println(String.format("  %-42s %15s", "Less: " + discount.getName(),
-                    "- " + Format.peso(BookingManager.round2(subtotal - total))));
+            // a PWD discount shows the ID number, so this label can be long
+            printSummaryLine("Less: " + discount.getName(), "- " + Format.peso(BookingManager.round2(subtotal - total)));
         }
-        System.out.println(String.format("  %-42s %15s", "TOTAL", Format.peso(total)));
+        printSummaryLine("TOTAL", Format.peso(total));
         System.out.println("  All prices are VAT-inclusive.");
         return total;
+    }
+
+    // One "label ...... amount" line of the summary; the amounts line up on the right
+    private void printSummaryLine(String label, String amount) {
+        System.out.println("  " + Format.fit(label, 42) + " " + Format.fitRight(amount, 15));
     }
 
     // STRATEGY PATTERN: each choice gives a different PaymentStrategy. Returns null if cancelled.
@@ -375,7 +430,7 @@ public class BookingMenu {
         Screen.option(3, "Credit/Debit Card (Visa / Mastercard)");
         Screen.option(4, "Cash (over the counter)");
         Screen.option(0, "Cancel booking");
-        int choice = readOption(4);
+        int choice = Screen.readChoice(4);
         if (choice == 1) return new EWalletPayment("GCash");
         if (choice == 2) return new EWalletPayment("Maya");
         if (choice == 3) return new CardPayment();
@@ -412,7 +467,7 @@ public class BookingMenu {
         Screen.boxLine("C U R A T O R    E - T I C K E T");
         Screen.boxDivider();
         Screen.boxLeft("Booking Ref : " + booking.getBookingId());
-        Screen.boxLeft("Movie       : " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
+        Screen.boxLeft("Movie       : " + Format.shorten(s.getMovie().getTitle(), 48) + " (" + s.getMovie().getAgeRating() + ")");
         Screen.boxLeft("Cinema      : " + cinemaName(s));
         Screen.boxLeft("Schedule    : " + Format.dateTime(s.getStart()));
         Screen.boxLeft("Seats       : " + seatListWithTypes(booking.getSeats()));
@@ -446,16 +501,20 @@ public class BookingMenu {
             }
             for (int i = 0; i < mine.size(); i++) {
                 Booking b = mine.get(i);
-                Screen.option(i + 1, String.format("%-10s %-25s %-21s %s", b.getBookingId(),
-                        b.getShowtime().getMovie().getTitle(), Format.shortDateTime(b.getShowtime().getStart()),
-                        b.getStatus()));
+                Screen.option(i + 1, Format.fit(b.getBookingId(), 10) + "  "
+                        + Format.fit(b.getShowtime().getMovie().getTitle(), 21) + "  "
+                        + Format.shortDateTime(b.getShowtime().getStart()) + "  " + b.getStatus());
             }
             Screen.option(0, "Back");
-            int choice = readOption(mine.size());
+            int choice = Screen.readMenuChoice(mine.size());
             if (choice == 0) {
                 back = true;
             } else {
-                showBooking(mine.get(choice - 1), customer);
+                try {
+                    showBooking(mine.get(choice - 1), customer);
+                } catch (GoBackException e) {
+                    Screen.backTo("My Bookings");
+                }
             }
         }
     }
@@ -475,7 +534,7 @@ public class BookingMenu {
         if (canCancel) {
             lastOption = 1;
         }
-        int choice = readOption(lastOption);
+        int choice = Screen.readChoice(lastOption);
         if (choice != 1) return;
         if (!ConsoleReader.readYesNo("Cancel booking " + booking.getBookingId() + "? (y/n): ")) {
             Screen.info("Your booking was kept.");
@@ -491,17 +550,6 @@ public class BookingMenu {
     }
 
     // ---------- helpers ----------
-
-    // Keeps asking until the choice is between 0 and max
-    private int readOption(int max) {
-        while (true) {
-            int choice = Screen.readChoice();
-            if (choice >= 0 && choice <= max) {
-                return choice;
-            }
-            Screen.error("Invalid choice. Please enter a number from 0 to " + max + ".");
-        }
-    }
 
     private String cinemaName(Showtime showtime) {
         return venueManager.getCinemaName(showtime.getRoom());
@@ -529,46 +577,109 @@ public class BookingMenu {
             Screen.option(2, "List promo codes");
             Screen.option(3, "Remove promo code");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice();
-            switch (choice) {
-                case 1:
-                    addPromo();
-                    break;
-                case 2:
-                    if (promoManager.getPromos().isEmpty()) Screen.info("No promo codes.");
-                    for (Promo p : promoManager.getPromos()) {
-                        String state = "valid until " + Format.date(p.getValidUntil());
-                        if (p.isExpired()) {
-                            state = "EXPIRED on " + Format.date(p.getValidUntil());
-                        }
-                        System.out.println(String.format("  %-15s %3d%% off   %-26s used by %d customer(s)",
-                                p.getCode(), p.getPercentOff(), state, p.getUsedBy().size()));
-                    }
-                    break;
-                case 3:
-                    if (promoManager.removePromo(ConsoleReader.readLine("Code to remove: "))) {
-                        Screen.success("Promo code removed.");
-                    } else {
-                        Screen.error("No such promo code.");
-                    }
-                    break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(3);
+            try {
+                switch (choice) {
+                    case 1:
+                        addPromo();
+                        break;
+                    case 2:
+                        printPromos();
+                        break;
+                    case 3:
+                        removePromo();
+                        break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Promo Codes");
             }
         }
     }
 
+    private void printPromos() {
+        if (promoManager.getPromos().isEmpty()) {
+            Screen.info("No promo codes.");
+            return;
+        }
+        Table table = new Table(15, 4, 24, 16);
+        table.alignRight(1);
+        table.printHeader("CODE", "OFF", "STATUS", "USED BY");
+        for (Promo p : promoManager.getPromos()) {
+            String state = "valid until " + Format.date(p.getValidUntil());
+            if (p.isExpired()) {
+                state = "EXPIRED on " + Format.date(p.getValidUntil());
+            }
+            table.printRow(p.getCode(), p.getPercentOff() + "%", state, p.getUsedBy().size() + " customer(s)");
+        }
+    }
+
+    // Each answer is checked as soon as it is typed and asked again if it is wrong
     private void addPromo() {
-        String code = ConsoleReader.readLine("New code (3-15 letters/digits): ");
-        int percent = ConsoleReader.readInt("Percent off (1-90): ");
-        String endDate = ConsoleReader.readLine("Valid until (yyyy-MM-dd, up to " + Validator.MAX_DAYS_AHEAD + " days ahead): ");
+        String code = askNewPromoCode();
+        if (code == null) return;
+        int percent = ConsoleReader.readNumber("Percent off (1-90): ", "Discount percent", 1, 90);
+        LocalDate validUntil = askPromoEndDate();
+        if (validUntil == null) return;
         try {
-            LocalDate validUntil = Validator.validatePromoEndDate(endDate);
             promoManager.addPromo(code, percent, validUntil);
             Screen.success("Promo code " + code.trim().toUpperCase() + " added (" + percent + "% off until "
                     + Format.date(validUntil) + ", once per customer).");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
+        }
+    }
+
+    // 3-15 letters/digits and not used yet. Returns null if left blank.
+    private String askNewPromoCode() {
+        while (true) {
+            String code = ConsoleReader.readLine("New code (3-15 letters/digits, blank to cancel): ");
+            if (code.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                Validator.validatePromoCode(code);
+                if (promoManager.findPromo(code) == null) {
+                    return code;
+                }
+                Screen.error("Promo code " + code.toUpperCase() + " already exists.");
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // From today up to one year ahead. Returns null if left blank.
+    private LocalDate askPromoEndDate() {
+        while (true) {
+            String text = ConsoleReader.readLine("Valid until (yyyy-MM-dd, up to " + Validator.MAX_DAYS_AHEAD
+                    + " days ahead, blank to cancel): ");
+            if (text.isEmpty()) {
+                Screen.info("Cancelled. No promo code was added.");
+                return null;
+            }
+            try {
+                return Validator.validatePromoEndDate(text);
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    private void removePromo() {
+        while (true) {   // asked again until the code exists
+            String code = ConsoleReader.readLine("Code to remove (blank to cancel): ");
+            if (code.isEmpty()) {
+                Screen.info("Cancelled.");
+                return;
+            }
+            if (promoManager.removePromo(code)) {
+                Screen.success("Promo code " + code.toUpperCase() + " removed.");
+                return;
+            }
+            Screen.error("No promo code " + code.toUpperCase() + ". Please try again.");
         }
     }
 }
