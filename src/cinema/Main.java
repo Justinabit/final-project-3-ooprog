@@ -6,6 +6,7 @@ import cinema.data.ErrorLog;
 import cinema.data.FileManager;
 import cinema.data.SampleData;
 import cinema.exception.CinemaException;
+import cinema.exception.GoBackException;
 import cinema.model.Admin;
 import cinema.model.Customer;
 import cinema.model.User;
@@ -103,8 +104,8 @@ public class Main {
             Screen.option(2, "Customer Login");
             Screen.option(3, "Admin Login");
             Screen.option(0, "Exit");
-            int choice = Screen.readChoice(3);
             try {
+                int choice = Screen.readChoice(3);
                 switch (choice) {
                     case 1:
                         accountMenu.register();                          // [A]
@@ -127,6 +128,8 @@ public class Main {
                     default:
                         Screen.error("Invalid choice. Try again.");
                 }
+            } catch (GoBackException e) {
+                Screen.backTo("the main menu");   // /return inside one of the options
             } catch (RuntimeException e) {
                 handleUnexpectedError(e);
             }
@@ -145,7 +148,7 @@ public class Main {
             Screen.option(3, "My Bookings");
             Screen.option(4, "My Profile");
             Screen.option(0, "Logout");
-            int choice = Screen.readChoice(4);
+            int choice = Screen.readMenuChoice(4);
             try {
                 switch (choice) {
                     case 1:
@@ -167,6 +170,8 @@ public class Main {
                     default:
                         Screen.error("Invalid choice. Try again.");
                 }
+            } catch (GoBackException e) {
+                Screen.backTo("the customer menu");   // /return inside one of the options
             } catch (RuntimeException e) {
                 handleUnexpectedError(e);
             }
@@ -190,7 +195,7 @@ public class Main {
             Screen.option(8, "Reports (revenue / attendance)");
             Screen.option(9, "My Profile");
             Screen.option(0, "Logout");
-            int choice = Screen.readChoice(9);
+            int choice = Screen.readMenuChoice(9);
             try {
                 switch (choice) {
                     case 1:
@@ -227,6 +232,8 @@ public class Main {
                     default:
                         Screen.error("Invalid choice. Try again.");
                 }
+            } catch (GoBackException e) {
+                Screen.backTo("the admin menu");   // /return inside one of the options
             } catch (RuntimeException e) {
                 handleUnexpectedError(e);
             }
@@ -242,7 +249,7 @@ public class Main {
             Screen.option(1, "Revenue Report");
             Screen.option(2, "Attendance Report");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(2);
+            int choice = Screen.readMenuChoice(2);
             switch (choice) {
                 case 1:
                     reportService.showRevenueReport();

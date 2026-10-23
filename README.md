@@ -30,9 +30,22 @@ src/cinema/
 ├── discount/        DiscountStrategy, PercentageDiscount, NoDiscount, StudentDiscount, SeniorDiscount,
 │                    PwdDiscount, PromoDiscount
 ├── layout/          SeatLayoutStrategy, StandardLayout, PremiumLayout, EconomyLayout
-├── exception/       CinemaException + Validation / Login / Booking / Payment / Venue / DataException
+├── exception/       CinemaException + Validation / Login / Booking / Payment / Venue / DataException,
+│                    GoBackException (not an error: the user typed /return)
 └── util/            Validator (every input rule), ConsoleReader (keyboard input), Format (pesos and dates)
 ```
+
+## Going back with /return
+Type `/return` at any prompt (any letter case, spaces around it are fine) to go back to the previous screen:
+- At a menu, it works like `0` (Back). At the customer or admin menu it logs out; at the main menu it shows the main menu again.
+- In the middle of a task (registering, logging in, adding a movie, editing a profile...), it leaves the task without
+  saving anything and shows the menu the task was started from.
+- While booking, it goes back ONE step: payment -> payment method -> ticket type / discount -> seats -> schedule -> movie
+  -> customer menu. At the promo code or PWD ID prompt it goes back to the discount list. Seats are only held while paying,
+  and are released if you go back, so nothing half-made is ever kept.
+
+How it works: `ConsoleReader` throws `GoBackException` when it reads `/return`; the screen that opened the current one
+catches it (`catch (GoBackException e)`) and shows itself again. Menus use `Screen.readMenuChoice`, which turns `/return` into `0`.
 
 ## How to debug
 | Problem | Look here |
@@ -62,7 +75,8 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 - Inheritance: Admin/Customer extend User, StandardSeat/VipSeat extend Seat, RegularTicket/StudentTicket extend Ticket,
   the discounts extend PercentageDiscount
 - Polymorphism: getRole(), getDetails(), matchesLogin(), getExtraCharge(), isVipRow(), calculatePrice(), pay(), applyDiscount()
-- Exceptions: CinemaException -> Validation / Login / Booking / Payment / Venue / Data. File errors become DataException,
+- Exceptions: CinemaException -> Validation / Login / Booking / Payment / Venue / Data. GoBackException carries /return
+  back to the previous screen. File errors become DataException,
   unexpected errors are caught in Main and written to `data/error.log` instead of crashing
 - Singleton: BookingManager
 - Strategy: PaymentStrategy (cash, card, GCash, Maya), DiscountStrategy (promo, senior, PWD, student), SeatLayoutStrategy
@@ -109,7 +123,8 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 | `\|` character | not allowed in typed text, because it separates the values in the data files |
 
 ## Behaviour decisions
-- Every screen asks again after a wrong entry; a blank line or `0` cancels. Yes/no questions accept only y / n.
+- Every screen asks again after a wrong entry; a blank line or `0` cancels; `/return` goes back one screen.
+  Yes/no questions accept only y / n.
 - Admin menu (one digit each): 1 Registered Users, 2 Booked Tickets / Transactions / Data Files, 3 Accounts,
   4 Venues, 5 Movies, 6 Showtimes, 7 Promo Codes, 8 Reports (revenue / attendance), 9 My Profile, 0 Logout.
 - Login: 3 tries per visit; 5 wrong passwords in a row lock the account for 15 minutes (an admin can unlock it).

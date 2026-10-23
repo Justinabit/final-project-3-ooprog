@@ -3,6 +3,7 @@ package cinema.ui;
 import java.util.ArrayList;
 
 import cinema.exception.BookingException;
+import cinema.exception.GoBackException;
 import cinema.exception.CinemaException;
 import cinema.exception.ValidationException;
 import cinema.model.CinemaBranch;
@@ -36,41 +37,45 @@ public class MovieMenu {
             Screen.option(3, "Search by title or genre");
             Screen.option(4, "View schedules for a movie");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(4);
-            switch (choice) {
-                case 1:
-                    Screen.section("NOW SHOWING");
-                    printMovies(moviesWithStatus("NOW SHOWING"));
-                    break;
-                case 2:
-                    Screen.section("COMING SOON");
-                    printMovies(moviesWithStatus("COMING SOON"));
-                    break;
-                case 3: {
-                    String keyword = ConsoleReader.readLine("Title or genre: ").toLowerCase();
-                    ArrayList<Movie> result = new ArrayList<>();
-                    for (Movie m : movieManager.getMovies()) {
-                        if (m.getTitle().toLowerCase().contains(keyword) || m.getGenre().toLowerCase().contains(keyword)) {
-                            result.add(m);
+            int choice = Screen.readMenuChoice(4);
+            try {
+                switch (choice) {
+                    case 1:
+                        Screen.section("NOW SHOWING");
+                        printMovies(moviesWithStatus("NOW SHOWING"));
+                        break;
+                    case 2:
+                        Screen.section("COMING SOON");
+                        printMovies(moviesWithStatus("COMING SOON"));
+                        break;
+                    case 3: {
+                        String keyword = ConsoleReader.readLine("Title or genre: ").toLowerCase();
+                        ArrayList<Movie> result = new ArrayList<>();
+                        for (Movie m : movieManager.getMovies()) {
+                            if (m.getTitle().toLowerCase().contains(keyword) || m.getGenre().toLowerCase().contains(keyword)) {
+                                result.add(m);
+                            }
                         }
+                        Screen.section("SEARCH RESULTS");
+                        printMovies(result);
+                        break;
                     }
-                    Screen.section("SEARCH RESULTS");
-                    printMovies(result);
-                    break;
-                }
-                case 4: {
-                    printMovies(movieManager.getMovies());
-                    Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID (e.g. M-1): "));
-                    if (m == null) {
-                        Screen.error("Movie not found.");
-                    } else {
-                        Screen.section("SCHEDULES: " + m.getTitle());
-                        printShowtimes(movieManager.getUpcomingShowtimes(m));
+                    case 4: {
+                        printMovies(movieManager.getMovies());
+                        Movie m = movieManager.findMovie(ConsoleReader.readLine("Movie ID (e.g. M-1): "));
+                        if (m == null) {
+                            Screen.error("Movie not found.");
+                        } else {
+                            Screen.section("SCHEDULES: " + m.getTitle());
+                            printShowtimes(movieManager.getUpcomingShowtimes(m));
+                        }
+                        break;
                     }
-                    break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
                 }
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            } catch (GoBackException e) {
+                Screen.backTo("Browse Movies");
             }
         }
     }
@@ -93,14 +98,18 @@ public class MovieMenu {
             Screen.option(3, "Remove movie");
             Screen.option(4, "List movies");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(4);
-            switch (choice) {
-                case 1: addMovie(); break;
-                case 2: editMovie(); break;
-                case 3: removeMovie(); break;
-                case 4: printMovies(movieManager.getMovies()); break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(4);
+            try {
+                switch (choice) {
+                    case 1: addMovie(); break;
+                    case 2: editMovie(); break;
+                    case 3: removeMovie(); break;
+                    case 4: printMovies(movieManager.getMovies()); break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Movies");
             }
         }
     }
@@ -199,14 +208,18 @@ public class MovieMenu {
             Screen.option(3, "Change a showtime's price");
             Screen.option(4, "Cancel a showtime (refunds every booking)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(4);
-            switch (choice) {
-                case 1: addShowtime(); break;
-                case 2: printShowtimes(movieManager.getUpcomingShowtimes(null)); break;
-                case 3: changePrice(); break;
-                case 4: cancelShowtime(); break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(4);
+            try {
+                switch (choice) {
+                    case 1: addShowtime(); break;
+                    case 2: printShowtimes(movieManager.getUpcomingShowtimes(null)); break;
+                    case 3: changePrice(); break;
+                    case 4: cancelShowtime(); break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Showtimes");
             }
         }
     }

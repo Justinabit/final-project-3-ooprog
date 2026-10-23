@@ -1,6 +1,7 @@
 package cinema.ui;
 
 import cinema.exception.CinemaException;
+import cinema.exception.GoBackException;
 import cinema.exception.ValidationException;
 import cinema.exception.VenueException;
 import cinema.layout.EconomyLayout;
@@ -41,19 +42,23 @@ public class VenueMenu {
             Screen.option(8, "View a room's seat map");
             Screen.option(9, "Change a seat type (Standard / VIP)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(9);
-            switch (choice) {
-                case 1: viewAll(); break;
-                case 2: addBranch(); break;
-                case 3: editBranch(); break;
-                case 4: removeBranch(); break;
-                case 5: addRoom(); break;
-                case 6: renameRoom(); break;
-                case 7: removeRoom(); break;
-                case 8: viewSeatMap(); break;
-                case 9: changeSeatType(); break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(9);
+            try {
+                switch (choice) {
+                    case 1: viewAll(); break;
+                    case 2: addBranch(); break;
+                    case 3: editBranch(); break;
+                    case 4: removeBranch(); break;
+                    case 5: addRoom(); break;
+                    case 6: renameRoom(); break;
+                    case 7: removeRoom(); break;
+                    case 8: viewSeatMap(); break;
+                    case 9: changeSeatType(); break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Venues");
             }
         }
     }

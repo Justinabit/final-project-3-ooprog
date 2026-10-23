@@ -1,5 +1,6 @@
 package cinema.ui;
 
+import cinema.exception.GoBackException;
 import cinema.util.ConsoleReader;
 
 // Shared look for every screen: the welcome banner, titles, menu options and messages.
@@ -40,7 +41,13 @@ public class Screen {
         filmStrip();
         border();
         System.out.println();
-        ConsoleReader.readLine(spaces(23) + "Press Enter to continue...");
+        System.out.println(spaces(12) + "Tip: type " + ConsoleReader.RETURN_COMMAND
+                + " at any prompt to go back to the previous screen.");
+        try {
+            ConsoleReader.readLine(spaces(23) + "Press Enter to continue...");
+        } catch (GoBackException e) {
+            // nothing to go back to from the welcome screen
+        }
     }
 
     public static void showGoodbye() {
@@ -76,10 +83,25 @@ public class Screen {
         System.out.println("  " + label + "  " + text);
     }
 
-    // Prints the bottom line of a menu and reads the user's choice (0 to max, exactly as shown)
+    // Prints the bottom line of a menu and reads the user's choice (0 to max, exactly as shown).
+    // Typing /return throws GoBackException (used inside a task, e.g. a booking step).
     public static int readChoice(int max) {
         line();
-        return ConsoleReader.readChoice("Enter your choice: ", max);
+        return ConsoleReader.readChoice("Enter your choice (" + ConsoleReader.RETURN_COMMAND + " = go back): ", max);
+    }
+
+    // For menus whose option 0 is "Back": typing /return there simply means 0 (Back).
+    public static int readMenuChoice(int max) {
+        try {
+            return readChoice(max);
+        } catch (GoBackException e) {
+            return 0;
+        }
+    }
+
+    // Shown when /return brought the user back to a menu
+    public static void backTo(String screenName) {
+        info("Back to " + screenName + ".");
     }
 
     public static void line() {

@@ -10,6 +10,7 @@ import cinema.discount.PwdDiscount;
 import cinema.discount.SeniorDiscount;
 import cinema.discount.StudentDiscount;
 import cinema.exception.BookingException;
+import cinema.exception.GoBackException;
 import cinema.exception.PaymentException;
 import cinema.exception.ValidationException;
 import cinema.model.Booking;
@@ -53,27 +54,69 @@ public class BookingMenu {
 
     // ---------- customer: book a ticket ----------
 
+    // The booking goes through numbered steps. Typing /return at any prompt goes back ONE step
+    // (and from step 1 back to the customer menu). 0 or a blank line cancels the booking.
     public void bookTicket(Customer customer) {
         Screen.title("BOOK A TICKET");
+        Screen.info("Type " + ConsoleReader.RETURN_COMMAND + " at any prompt to go back one step.");
+        Movie movie = null;
+        Showtime showtime = null;
+        ArrayList<Seat> seats = null;
+        ArrayList<Ticket> tickets = null;
+        DiscountStrategy discount = null;
+        PaymentStrategy payment = null;
+        double total = 0;
 
-        // STEP 1: movie
-        Movie movie = chooseMovie(customer);
-        if (movie == null) return;
+        int step = 1;
+        while (true) {
+            try {
+                if (step == 1) {
+                    movie = chooseMovie(customer);
+                    if (movie == null) return;
+                } else if (step == 2) {
+                    showtime = chooseShowtime(movie);
+                    if (showtime == null) return;
+                } else if (step == 3) {
+                    Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
+                    System.out.println("  " + movie.getTitle() + "  |  " + cinemaName(showtime) + "  |  "
+                            + Format.dateTime(showtime.getStart()));
+                    SeatMap.print(showtime.getRoom(), showtime);
+                    seats = chooseSeats(showtime);
+                    if (seats == null) return;
+                } else if (step == 4) {
+                    Screen.section("STEP 4 OF 5: TICKET TYPE AND DISCOUNT");
+                    tickets = chooseTickets(showtime, seats);
+                    if (tickets == null) return;
+                    discount = chooseDiscountFor(customer, tickets);
+                    if (discount == null) return;
+                } else if (step == 5) {
+                    Screen.section("STEP 5 OF 5: REVIEW AND PAY");
+                    total = printOrderSummary(showtime, tickets, discount);
+                    payment = choosePayment();
+                    if (payment == null) return;
+                } else {
+                    if (!ConsoleReader.readYesNo("Confirm and pay " + Format.peso(total) + " with "
+                            + payment.getDisplayName() + "? (y/n): ")) {
+                        Screen.info("Booking cancelled. Nothing was charged.");
+                        return;
+                    }
+                    payAndConfirm(customer, showtime, tickets, discount, payment, total);
+                    return;
+                }
+                step++;
+            } catch (GoBackException e) {
+                step--;
+                if (step < 1) {
+                    Screen.backTo("the customer menu");
+                    return;
+                }
+                Screen.info("Going back one step.");
+            }
+        }
+    }
 
-        // STEP 2: schedule
-        Showtime showtime = chooseShowtime(movie);
-        if (showtime == null) return;
-
-        // STEP 3: seats
-        Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
-        System.out.println("  " + movie.getTitle() + "  |  " + cinemaName(showtime) + "  |  "
-                + Format.dateTime(showtime.getStart()));
-        SeatMap.print(showtime.getRoom(), showtime);
-        ArrayList<Seat> seats = chooseSeats(showtime);
-        if (seats == null) return;
-
-        // STEP 4: ticket type and discount
-        Screen.section("STEP 4 OF 5: TICKET TYPE AND DISCOUNT");
+    // STEP 4a: Regular or Student tickets for every seat. Returns null if the booking is cancelled.
+    private ArrayList<Ticket> chooseTickets(Showtime showtime, ArrayList<Seat> seats) {
         System.out.println("  Ticket type:");
         Screen.option(1, "Regular");
         Screen.option(2, "Student (20% off, valid school ID required)");
@@ -81,44 +124,38 @@ public class BookingMenu {
         int ticketType = Screen.readChoice(2);
         if (ticketType == 0) {
             Screen.info("Booking cancelled.");
-            return;
+            return null;
         }
-        boolean student = ticketType == 2;
         ArrayList<Ticket> tickets = new ArrayList<>();
         for (Seat seat : seats) {
-            if (student) {
+            if (ticketType == 2) {
                 tickets.add(new StudentTicket(showtime, seat));
             } else {
                 tickets.add(new RegularTicket(showtime, seat));
             }
         }
-        DiscountStrategy discount;
-        if (student) {
-            // One discount per booking: student tickets get the student discount and nothing else.
+        return tickets;
+    }
+
+    // STEP 4b: one discount per booking. Student tickets get the student discount and nothing else.
+    private DiscountStrategy chooseDiscountFor(Customer customer, ArrayList<Ticket> tickets) {
+        if (tickets.get(0) instanceof StudentTicket) {
             Screen.info("Note: " + tickets.get(0).getEligibilityNote());
             Screen.info("The student discount (" + StudentDiscount.PERCENT + "% off) cannot be combined with other discounts.");
-            discount = new StudentDiscount();
-        } else {
-            discount = chooseDiscount(customer);
-            if (discount == null) {
-                Screen.info("Booking cancelled.");
-                return;
-            }
+            return new StudentDiscount();
         }
-
-        // STEP 5: review and pay
-        Screen.section("STEP 5 OF 5: REVIEW AND PAY");
-        double total = printOrderSummary(showtime, tickets, discount);
-        PaymentStrategy payment = choosePayment();
-        if (payment == null) return;
-        if (!ConsoleReader.readYesNo("Confirm and pay " + Format.peso(total) + " with " + payment.getDisplayName() + "? (y/n): ")) {
-            Screen.info("Booking cancelled. Nothing was charged.");
-            return;
+        DiscountStrategy discount = chooseDiscount(customer);
+        if (discount == null) {
+            Screen.info("Booking cancelled.");
         }
+        return discount;
+    }
 
-        // Hold the seats first, then take the payment. If ANYTHING stops us before the payment is saved
-        // (a failed payment, a price mismatch, an unexpected error), the finally block releases the seats
-        // and forgets the booking, so an unpaid booking can never stay in the system.
+    // STEP 6: hold the seats first, then take the payment. If ANYTHING stops us before the payment is saved
+    // (a failed payment, a price mismatch, /return, an unexpected error), the finally block releases the seats
+    // and forgets the booking, so an unpaid booking can never stay in the system.
+    private void payAndConfirm(Customer customer, Showtime showtime, ArrayList<Ticket> tickets,
+            DiscountStrategy discount, PaymentStrategy payment, double total) {
         Booking booking = null;
         boolean paid = false;
         try {
@@ -305,10 +342,15 @@ public class BookingMenu {
         }
     }
 
-    // Keeps asking until the code can be used. Blank goes back to the discount list (returns null).
+    // Keeps asking until the code can be used. Blank or /return goes back to the discount list (returns null).
     private Promo askPromoCode(Customer customer) {
         while (true) {
-            String code = ConsoleReader.readLine("Promo code (blank to go back): ");
+            String code;
+            try {
+                code = ConsoleReader.readLine("Promo code (blank or /return to go back): ");
+            } catch (GoBackException e) {
+                return null;
+            }
             if (code.isEmpty()) {
                 return null;
             }
@@ -325,10 +367,15 @@ public class BookingMenu {
         }
     }
 
-    // Keeps asking until the PWD ID looks right. Blank goes back to the discount list (returns null).
+    // Keeps asking until the PWD ID looks right. Blank or /return goes back to the discount list (returns null).
     private String askPwdId() {
         while (true) {
-            String id = ConsoleReader.readLine("PWD ID number (blank to go back): ");
+            String id;
+            try {
+                id = ConsoleReader.readLine("PWD ID number (blank or /return to go back): ");
+            } catch (GoBackException e) {
+                return null;
+            }
             if (id.isEmpty()) {
                 return null;
             }
@@ -451,11 +498,15 @@ public class BookingMenu {
                         b.getStatus()));
             }
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(mine.size());
+            int choice = Screen.readMenuChoice(mine.size());
             if (choice == 0) {
                 back = true;
             } else {
-                showBooking(mine.get(choice - 1), customer);
+                try {
+                    showBooking(mine.get(choice - 1), customer);
+                } catch (GoBackException e) {
+                    Screen.backTo("My Bookings");
+                }
             }
         }
     }
@@ -518,31 +569,35 @@ public class BookingMenu {
             Screen.option(2, "List promo codes");
             Screen.option(3, "Remove promo code");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(3);
-            switch (choice) {
-                case 1:
-                    addPromo();
-                    break;
-                case 2:
-                    if (promoManager.getPromos().isEmpty()) Screen.info("No promo codes.");
-                    for (Promo p : promoManager.getPromos()) {
-                        String state = "valid until " + Format.date(p.getValidUntil());
-                        if (p.isExpired()) {
-                            state = "EXPIRED on " + Format.date(p.getValidUntil());
+            int choice = Screen.readMenuChoice(3);
+            try {
+                switch (choice) {
+                    case 1:
+                        addPromo();
+                        break;
+                    case 2:
+                        if (promoManager.getPromos().isEmpty()) Screen.info("No promo codes.");
+                        for (Promo p : promoManager.getPromos()) {
+                            String state = "valid until " + Format.date(p.getValidUntil());
+                            if (p.isExpired()) {
+                                state = "EXPIRED on " + Format.date(p.getValidUntil());
+                            }
+                            System.out.println(String.format("  %-15s %3d%% off   %-26s used by %d customer(s)",
+                                    p.getCode(), p.getPercentOff(), state, p.getUsedBy().size()));
                         }
-                        System.out.println(String.format("  %-15s %3d%% off   %-26s used by %d customer(s)",
-                                p.getCode(), p.getPercentOff(), state, p.getUsedBy().size()));
-                    }
-                    break;
-                case 3:
-                    if (promoManager.removePromo(ConsoleReader.readLine("Code to remove: "))) {
-                        Screen.success("Promo code removed.");
-                    } else {
-                        Screen.error("No such promo code.");
-                    }
-                    break;
-                case 0: back = true; break;
-                default: Screen.error("Invalid choice. Try again.");
+                        break;
+                    case 3:
+                        if (promoManager.removePromo(ConsoleReader.readLine("Code to remove: "))) {
+                            Screen.success("Promo code removed.");
+                        } else {
+                            Screen.error("No such promo code.");
+                        }
+                        break;
+                    case 0: back = true; break;
+                    default: Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Promo Codes");
             }
         }
     }

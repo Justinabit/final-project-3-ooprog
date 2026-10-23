@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import cinema.data.FileManager;
 import cinema.data.TransactionLog;
 import cinema.exception.BookingException;
+import cinema.exception.GoBackException;
 import cinema.exception.DataException;
 import cinema.model.Booking;
 import cinema.model.Customer;
@@ -77,29 +78,33 @@ public class RecordsMenu {
             Screen.option(4, "Transaction log (every payment and refund)");
             Screen.option(5, "Data files (saved records)");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(5);
-            switch (choice) {
-                case 1:
-                    Screen.section("ALL BOOKINGS");
-                    printBookings(BookingManager.getInstance().getAllBookings());
-                    break;
-                case 2:
-                    bookingsOfCustomer();
-                    break;
-                case 3:
-                    openBooking();
-                    break;
-                case 4:
-                    printTransactions();
-                    break;
-                case 5:
-                    showDataFiles();
-                    break;
-                case 0:
-                    back = true;
-                    break;
-                default:
-                    Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(5);
+            try {
+                switch (choice) {
+                    case 1:
+                        Screen.section("ALL BOOKINGS");
+                        printBookings(BookingManager.getInstance().getAllBookings());
+                        break;
+                    case 2:
+                        bookingsOfCustomer();
+                        break;
+                    case 3:
+                        openBooking();
+                        break;
+                    case 4:
+                        printTransactions();
+                        break;
+                    case 5:
+                        showDataFiles();
+                        break;
+                    case 0:
+                        back = true;
+                        break;
+                    default:
+                        Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Booked Tickets");
             }
         }
     }
@@ -222,7 +227,7 @@ public class RecordsMenu {
             Screen.line();
             Screen.option(1, "Save now");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(1);
+            int choice = Screen.readMenuChoice(1);
             if (choice == 1) {
                 try {
                     fileManager.saveAll();

@@ -3,8 +3,12 @@ package cinema.util;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 
+import cinema.exception.GoBackException;
+
 // [Member D] Helper for reading input safely. Everyone uses this instead of making their own Scanner.
 public class ConsoleReader {
+    public static final String RETURN_COMMAND = "/return";   // typed at any prompt to go back one screen
+
     private static Scanner scanner = new Scanner(System.in);
 
     // Reads a line of text with the spaces around it removed. Prompts are indented so they line up with the menus.
@@ -12,16 +16,22 @@ public class ConsoleReader {
         return readExactLine(prompt).trim();
     }
 
-    // Reads a line exactly as typed (spaces kept), so readChoice can reject " 1"
+    // Reads a line exactly as typed (spaces kept), so readChoice can reject " 1".
+    // Every input goes through here, so typing /return anywhere throws GoBackException.
     private static String readExactLine(String prompt) {
         System.out.print("  " + prompt);
+        String line;
         try {
-            return scanner.nextLine();
+            line = scanner.nextLine();
         } catch (NoSuchElementException e) {   // input stream closed (Ctrl+D / end of piped input)
             System.out.println("\nInput ended. Goodbye!");
             System.exit(0);
             return "";
         }
+        if (line.trim().equalsIgnoreCase(RETURN_COMMAND)) {
+            throw new GoBackException();
+        }
+        return line;
     }
 
     // Menu choices: only the number exactly as it is shown, from 0 to max.

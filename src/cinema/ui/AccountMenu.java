@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 
 import cinema.exception.LoginException;
+import cinema.exception.GoBackException;
 import cinema.exception.ValidationException;
 import cinema.model.Admin;
 import cinema.model.Customer;
@@ -117,22 +118,26 @@ public class AccountMenu {
             if (user instanceof Customer) {
                 Screen.info("To correct your birthdate, please ask an admin (bring a valid ID).");
             }
-            int choice = Screen.readChoice(3);
-            switch (choice) {
-                case 1:
-                    editName(user);
-                    break;
-                case 2:
-                    editEmail(user);
-                    break;
-                case 3:
-                    changePassword(user);
-                    break;
-                case 0:
-                    back = true;
-                    break;
-                default:
-                    Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(3);
+            try {
+                switch (choice) {
+                    case 1:
+                        editName(user);
+                        break;
+                    case 2:
+                        editEmail(user);
+                        break;
+                    case 3:
+                        changePassword(user);
+                        break;
+                    case 0:
+                        back = true;
+                        break;
+                    default:
+                        Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("My Profile");
             }
         }
     }
@@ -189,37 +194,41 @@ public class AccountMenu {
             Screen.option(7, "Correct a customer's birthdate (check their ID)");
             Screen.option(8, "Create an admin account");
             Screen.option(0, "Back");
-            int choice = Screen.readChoice(8);
-            switch (choice) {
-                case 1:
-                    listAllAccounts();
-                    break;
-                case 2:
-                    searchCustomers();
-                    break;
-                case 3:
-                    changeCustomerStatus(false);
-                    break;
-                case 4:
-                    changeCustomerStatus(true);
-                    break;
-                case 5:
-                    unlockAccount();
-                    break;
-                case 6:
-                    resetCustomerPassword();
-                    break;
-                case 7:
-                    correctBirthDate();
-                    break;
-                case 8:
-                    createAdmin();
-                    break;
-                case 0:
-                    back = true;
-                    break;
-                default:
-                    Screen.error("Invalid choice. Try again.");
+            int choice = Screen.readMenuChoice(8);
+            try {
+                switch (choice) {
+                    case 1:
+                        listAllAccounts();
+                        break;
+                    case 2:
+                        searchCustomers();
+                        break;
+                    case 3:
+                        changeCustomerStatus(false);
+                        break;
+                    case 4:
+                        changeCustomerStatus(true);
+                        break;
+                    case 5:
+                        unlockAccount();
+                        break;
+                    case 6:
+                        resetCustomerPassword();
+                        break;
+                    case 7:
+                        correctBirthDate();
+                        break;
+                    case 8:
+                        createAdmin();
+                        break;
+                    case 0:
+                        back = true;
+                        break;
+                    default:
+                        Screen.error("Invalid choice. Try again.");
+                }
+            } catch (GoBackException e) {
+                Screen.backTo("Manage Accounts");
             }
         }
     }
