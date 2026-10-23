@@ -1,24 +1,4 @@
-<<<<<<< HEAD
-# Cinema Booking System (Skeleton)
-=======
 # CURATOR - Cinema Booking System
-
-## Project structure
-```
-src/cinema/
-├── Main.java        entry point + sample data
-├── model/           User, Admin, Customer, Movie, Showtime, Seat, StandardSeat, VipSeat,
-│                    CinemaRoom, CinemaBranch, Booking, Ticket, RegularTicket, StudentTicket, Promo
-├── service/         UserManager, MovieManager, VenueManager, PromoManager,
-│                    BookingManager (Singleton), ReportService
-├── ui/              Screen (shared look + welcome screen), SeatMap, AccountMenu, MovieMenu, VenueMenu, BookingMenu
-├── payment/         PaymentStrategy, CashPayment, CardPayment, EWalletPayment (GCash / Maya)
-├── discount/        DiscountStrategy, NoDiscount, StudentDiscount, SeniorDiscount, PwdDiscount, PromoDiscount
-├── layout/          SeatLayoutStrategy, StandardLayout, PremiumLayout, EconomyLayout
-├── exception/       CinemaException + Validation/Login/Booking/Payment/VenueException
-└── util/            Validator, ConsoleReader, Format (pesos and dates)
-```
->>>>>>> main
 
 ## How to run
 From the project root:
@@ -30,65 +10,120 @@ javac -d out $(find src -name "*.java")
 
 java -cp out cinema.Main
 ```
+The first run creates the sample data and saves it in a `data` folder next to where you ran the program.
+Every later run loads that folder, so accounts, bookings and admin changes are kept.
+
+## Project structure
+Each folder has one job, so when something goes wrong you know where to look.
+```
+src/cinema/
+├── Main.java        start-up only: load data, show the menus, save after every action
+├── model/           the things in a cinema: User, Admin, Customer, Movie, Showtime, Seat, StandardSeat, VipSeat,
+│                    CinemaRoom, CinemaBranch, Booking, Ticket, RegularTicket, StudentTicket, Promo
+├── service/         the rules (no Scanner / System.out): UserManager, MovieManager, VenueManager, PromoManager,
+│                    BookingManager (Singleton), ReportService
+├── ui/              the screens: Screen (shared look + welcome screen), SeatMap, AccountMenu, MovieMenu,
+│                    VenueMenu, BookingMenu, RecordsMenu (admin: users, bookings, transactions, data files)
+├── data/            everything that reads or writes files: FileManager, SampleData (first run only),
+│                    TransactionLog (payments and refunds), ErrorLog (unexpected errors)
+├── payment/         PaymentStrategy, CashPayment, CardPayment, EWalletPayment (GCash / Maya)
+├── discount/        DiscountStrategy, PercentageDiscount, NoDiscount, StudentDiscount, SeniorDiscount,
+│                    PwdDiscount, PromoDiscount
+├── layout/          SeatLayoutStrategy, StandardLayout, PremiumLayout, EconomyLayout
+├── exception/       CinemaException + Validation / Login / Booking / Payment / Venue / DataException
+└── util/            Validator (every input rule), ConsoleReader (keyboard input), Format (pesos and dates)
+```
+
+## How to debug
+| Problem | Look here |
+|---|---|
+| An input is accepted or rejected wrongly | `util/Validator.java` - every rule and limit is a constant at the top |
+| A booking, refund or price is wrong | `service/BookingManager.java` (money is rounded to centavos there) |
+| Saved data is missing or wrong | the `data/*.txt` files - each starts with a `#` line naming the columns |
+| A payment or refund needs checking | `data/transactions.txt` (one line per payment / refund, never changed) |
+| "Something went wrong" appeared | `data/error.log` - the time and the full Java error with the line number |
+| A data file was edited by hand and broke | the program skips the bad line, says which one, and keeps a copy as `<file>.bak` |
+
+To start over with fresh sample data, close CURATOR and delete the `data` folder.
 
 ## Who does what
 | Member | Files |
 |---|---|
 | A - Accounts & Venues | User, Admin, Customer, Validator, UserManager, AccountMenu, Seat, StandardSeat, VipSeat, CinemaRoom, CinemaBranch, SeatLayoutStrategy + layouts, VenueManager, VenueMenu |
 | B - Movies & Showtimes | Movie, Showtime, MovieManager, MovieMenu |
-| C - Booking & Promos | Booking, BookingManager (Singleton), DiscountStrategy, NoDiscount, StudentDiscount, SeniorDiscount, PwdDiscount, PromoDiscount, BookingMenu |
-| D - Pricing, Payments, Reports | Ticket, RegularTicket, StudentTicket, PaymentStrategy, CashPayment, CardPayment, EWalletPayment, ReportService, ConsoleReader, loadSampleData() in Main |
+| C - Booking & Promos | Booking, Promo, BookingManager (Singleton), PromoManager, DiscountStrategy + discounts, BookingMenu |
+| D - Pricing, Payments, Reports | Ticket, RegularTicket, StudentTicket, PaymentStrategy + payments, ReportService, ConsoleReader, SampleData |
 
-Shared: the 6 Exception classes, Screen.java and SeatMap.java (used by every menu), Format.java and Main.java.
+Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 7 exception classes.
 
 ## Requirement checklist
-- Encapsulation: private fields + getters/setters that validate (User, Customer, CinemaBranch, CinemaRoom, Movie)
-- Abstraction: abstract User, abstract Seat, abstract Ticket, interfaces
-- Inheritance: Admin/Customer extend User, StandardSeat/VipSeat extend Seat, RegularTicket/StudentTicket extend Ticket
-- Polymorphism: getRole(), getDetails(), getExtraCharge(), isVipRow(), calculatePrice(), pay(), applyDiscount()
-- Exceptions: CinemaException -> Validation / Login / Booking / Payment / Venue
+- Encapsulation: private fields + setters that validate (User, Customer, CinemaBranch, CinemaRoom, Movie, Showtime, Booking)
+- Abstraction: abstract User, Seat, Ticket and PercentageDiscount, plus the strategy interfaces
+- Inheritance: Admin/Customer extend User, StandardSeat/VipSeat extend Seat, RegularTicket/StudentTicket extend Ticket,
+  the discounts extend PercentageDiscount
+- Polymorphism: getRole(), getDetails(), matchesLogin(), getExtraCharge(), isVipRow(), calculatePrice(), pay(), applyDiscount()
+- Exceptions: CinemaException -> Validation / Login / Booking / Payment / Venue / Data. File errors become DataException,
+  unexpected errors are caught in Main and written to `data/error.log` instead of crashing
 - Singleton: BookingManager
-- Strategy: PaymentStrategy (cash, card, GCash, Maya), DiscountStrategy (promo, senior, PWD, student) and SeatLayoutStrategy
-- Validation: Validator class (Member A) + checks in every menu
+- Strategy: PaymentStrategy (cash, card, GCash, Maya), DiscountStrategy (promo, senior, PWD, student), SeatLayoutStrategy
+- File handling: FileManager saves and loads every record with PrintWriter / Scanner; TransactionLog appends
 
-## Rules
-- All TODOs are implemented (`grep -rn TODO src` returns nothing).
+## Rules for the code
+- Keep Scanner / System.out in the `ui` classes; keep `service` classes as plain logic.
+- Put new input rules in `Validator` so every screen uses the same limits.
+- Use `Screen` for titles, options and messages, `Format.peso(...)` for money and `Format.dateTime(...)` for dates.
 - Don't rename methods others use without telling the team.
-- Keep Scanner / System.out in the *Menu classes; keep managers as plain logic.
-- Use `Screen` for titles, options and messages (`Screen.title`, `Screen.option`, `Screen.readChoice`,
-  `Screen.success` / `error` / `info`) so every screen looks the same.
-- Show money with `Format.peso(amount)` and dates with `Format.dateTime(...)` / `Format.shortDateTime(...)`.
 
-## Sample data (loaded on start)
-- Admin: `admin@cinema.com` / `Admin123`
-- Customers: `juan@mail.com` / `Customer1` (age 21), `maria@mail.com` / `Customer2` (19),
-  `jose@mail.com` / `Customer3` (34), `lola@mail.com` / `Senior123` (67, senior citizen)
-- Promo codes: `WELCOME10` (10% off), `MOVIENIGHT` (15% off)
+## Sample data (created on the first run)
+- Admin: username `Admin123` (or email `admin@cinema.com`) / password `AdminLogin12`
+- Customers: `juan@mail.com` / `Customer1` (born 2005-03-14), `maria@mail.com` / `Customer2` (2007-06-02),
+  `jose@mail.com` / `Customer3` (1992-01-20), `lola@mail.com` / `Senior123` (1959-05-10, senior citizen)
+- Promo codes: `WELCOME10` (10% off, 180 days), `MOVIENIGHT` (15% off, 90 days) - once per customer
 - Branches: SM City Lipa (Cinema 1-3) and Robinsons Place Lipa (Cinema 1-2)
 - Now showing: Spider-Man: Brand New Day, Digger, Street Fighter, Clayface, The Social Reckoning, Terrifier 4.
   Coming soon: The Hunger Games: Sunrise on the Reaping, Avengers: Doomsday, Dune: Part Three.
   (Ratings and runtimes are sample values.)
-- 23 showtimes dated tomorrow / the day after (always upcoming), PHP 350-400 for a regular seat
+- 23 showtimes for the two days after the first run, PHP 350-400 for a regular seat
 - A few seats are already booked by Maria and Jose, so the seat maps look like a real, busy cinema
+- Demo card for paying: `4111 1111 1111 1111`, any future expiry (e.g. `12/30`), any 3-digit CVV
+
+## Input rules (all in `util/Validator.java`)
+| Field | Rule |
+|---|---|
+| Name | 2-50 characters; letters (ñ, é... allowed), spaces, and `. ' -` after a letter; extra spaces are removed |
+| Email | like `name@example.com`, no `..`, ending of 2+ letters, max 100 characters, saved in lowercase, unique |
+| Password | 8-64 characters with an uppercase letter, a lowercase letter and a number; no spaces or `\|` |
+| Birthdate | `yyyy-MM-dd`, a real date, not in the future; age 13-100 to have an account |
+| Admin username | 4-20 letters or digits, unique |
+| Branch / location / room name | not empty; max 40 / 60 / 30 characters; branch names unique, room names unique per branch |
+| Room size | 2-26 rows, 4-30 seats per row |
+| Movie | title max 60 characters and unique; genre from the list; rating G, PG, R-13, R-16, R-18; 1-600 minutes |
+| Showtime | `yyyy-MM-dd HH:mm`, not in the past, at most 365 days ahead, starts 9:00 AM-11:30 PM, no overlap (15-min cleaning gap) |
+| Regular seat price | PHP 100.00-2,000.00, at most 2 decimals (VIP seats add PHP 200) |
+| Money typed in | digits only, at most 2 decimals (`450`, `450.50`, `1,000`); `NaN`, `-100`, `1e3`, `400f` are asked again |
+| Promo code | 3-15 letters/digits, 1-90% off, end date from today to 365 days ahead |
+| PWD ID | digits and dashes, 10-25 characters, at least 8 digits (e.g. `04-1014-000-0001234`) |
+| Card | 16 digits, Visa (4) or Mastercard (5 / 2), passes the Luhn check, expiry `MM/YY` not in the past, 3-digit CVV |
+| GCash / Maya | 11-digit number starting with `09`, then the OTP shown on screen (demo) |
+| `\|` character | not allowed in typed text, because it separates the values in the data files |
 
 ## Behaviour decisions
-- Register asks one field at a time and asks again if it is invalid; a blank field cancels. Passwords are typed twice.
-- Login allows 3 attempts, then goes back to the main menu.
-- Admins can create other admin accounts, reset a customer's password, and deactivate / reactivate customers.
-- When adding a room the admin picks a seat layout: Standard (last row VIP), Premium (back half VIP) or Economy (no VIP).
-  Single seats can be switched between Standard and VIP later; bookings already made keep their price.
-- A room (or a whole branch) cannot be removed while it has upcoming showtimes with confirmed bookings;
-  otherwise its showtimes are removed with it. Branch names are unique; room names are unique inside a branch.
-- Currency is the Philippine peso, shown as `PHP 1,250.00` (the peso sign does not print in every console).
-- Booking goes step by step like a real cinema app: choose a movie -> a schedule (grouped by branch) ->
-  seats on the seat map -> ticket type and discount -> review and pay -> e-ticket with a booking reference (CUR-100001...).
-- Seat map: `[A1 ]` regular, `{E1 }` VIP, `[XX ]` taken. VIP seats can be booked like any seat and cost PHP 200 more.
-- Price = sum of each seat's own price (VIP = regular + PHP 200, Student ticket 20% off), then one discount
-  (promo code, senior citizen 60+, or PWD with an ID number). Prices are VAT-inclusive.
-- Payment: GCash / Maya (11-digit 09 number + a demo OTP shown on screen), credit/debit card, or cash.
-- Seats are held first, then payment is taken (3 attempts). If payment fails, the seats are released and no booking is kept.
-- Cancelling refunds through the same payment method; not allowed once a showtime has started.
-- MTRCB ratings G, PG, R-13, R-16, R-18. R-13 / R-16 / R-18 movies are blocked for customers under 13 / 16 / 18.
-- A movie cannot be removed while it has upcoming showtimes with confirmed bookings; otherwise its showtimes are removed with it.
-- A room cannot host overlapping showtimes (15 minute cleaning gap). Showtimes use `yyyy-MM-dd HH:mm`.
-- Passwords are stored in plain text (fine for a class project; hash them for real use).
+- Every screen asks again after a wrong entry; a blank line or `0` cancels. Yes/no questions accept only y / n.
+- Login: 3 tries per visit; 5 wrong passwords in a row lock the account for 15 minutes (an admin can unlock it).
+- Customers can't change their own birthdate (that would get around age ratings and the senior discount);
+  an admin can correct it after checking an ID. The age is worked out from the birthdate, so it is always current.
+- Booking: movie -> schedule (grouped by branch) -> seats on the seat map -> ticket type and discount ->
+  review and pay -> e-ticket with a booking reference (CUR-100001...).
+- Seat map: `[A1 ]` regular, `{E1 }` VIP, `[XX ]` taken. VIP seats cost PHP 200 more.
+- Price = sum of each seat's price, then ONE discount for the whole booking (student tickets get only the student discount;
+  otherwise promo code, senior citizen 60+, or PWD). Prices are VAT-inclusive.
+- Seats are held first, then payment is taken (3 attempts). If payment fails, the seats are released and nothing is kept.
+- Customers can cancel online until 2 hours before the show (full refund the same way they paid);
+  an admin can cancel any booking until the show starts.
+- An admin can change a showtime's price (bookings already made keep their price) or cancel a showtime
+  (every booking is refunded and the showtime is kept, marked cancelled, for the history).
+- A movie, room or branch can't be removed once it has bookings (set the movie to COMING SOON instead).
+- A booked seat can't change between Standard and VIP until that show has ended.
+- Changing a movie's duration is refused if its showtimes would then overlap other shows in the same room.
+- New IDs (U-, M-, S-, BR-, RM-, CUR-) are used only when something is really added, and continue after a restart.
+- Passwords are stored in plain text in `data/users.txt` (fine for a class project; hash them for real use).

@@ -9,3 +9,6 @@ bin/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Saved records created when CURATOR runs (each member keeps their own test data)
+/data/
