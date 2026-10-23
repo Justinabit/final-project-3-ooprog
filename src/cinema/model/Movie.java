@@ -76,6 +76,16 @@ public class Movie {
         return String.format("%dh %02dm", hours, minutes);
     }
 
+    // true if this movie can be booked right now
+    public boolean isNowShowing() {
+        return "NOW SHOWING".equals(status);
+    }
+
+    // true if a customer of this age is allowed to watch (MTRCB rating)
+    public boolean isAllowedForAge(int age) {
+        return age >= getMinimumAge();
+    }
+
     @Override
     public String toString() {
         String shownTitle = title;
