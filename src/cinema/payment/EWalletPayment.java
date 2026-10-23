@@ -18,6 +18,7 @@ public class EWalletPayment implements PaymentStrategy {
     public String getDisplayName() { return walletName; }
 
     public void pay(double amount) throws PaymentException {
+        PaymentStrategy.validateAmount(amount);
         String number = ConsoleReader.readLine(walletName + " mobile number (09XXXXXXXXX): ").replaceAll("[ -]", "");
         if (!number.matches("09\\d{9}")) {
             throw new PaymentException("Invalid mobile number. It must have 11 digits and start with 09.");

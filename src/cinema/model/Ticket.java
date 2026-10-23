@@ -10,7 +10,7 @@ public abstract class Ticket {
         this.seat = seat;
     }
 
-    public abstract double calculatePrice();     // seat price (base + VIP extra), then the ticket-type discount
+    public abstract double calculatePrice();     // seat price only (base + VIP extra). Discounts are applied once per booking by BookingManager.
     public abstract String getTicketType();      // "Regular", "Student", ...
     public String getEligibilityNote() {
         return "No requirements.";               // subclasses can override (e.g. "Valid student ID required")
