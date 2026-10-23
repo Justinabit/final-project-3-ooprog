@@ -64,6 +64,22 @@ public class ConsoleReader {
         }
     }
 
+    // Keeps asking until the user types a whole number from min to max. The number is checked as soon as
+    // it is typed, so a wrong value is asked again right away (not after the whole form is filled in).
+    // label is used in the message, e.g. "Rows must be between 2 and 26."
+    public static int readNumber(String prompt, String label, int min, int max) {
+        while (true) {
+            String text = readLine(prompt);
+            if (!text.matches("[0-9]{1,9}")) {
+                System.out.println("  [ !! ] Please enter a whole number from " + min + " to " + max + ".");
+            } else if (Integer.parseInt(text) < min || Integer.parseInt(text) > max) {
+                System.out.println("  [ !! ] " + label + " must be between " + min + " and " + max + ". Please try again.");
+            } else {
+                return Integer.parseInt(text);
+            }
+        }
+    }
+
     // Keeps asking until the user types a money amount like 450, 450.50 or 1,250
     // (digits only, at most 2 decimal places; no letters, minus signs or "1e3").
     public static double readAmount(String prompt) {

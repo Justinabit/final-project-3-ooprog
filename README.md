@@ -115,7 +115,7 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 | Birthdate | `yyyy-MM-dd`, a real date, not in the future; age 13-100 to have an account |
 | Admin username | 4-20 letters or digits, unique |
 | Branch / location / room name | not empty; max 40 / 60 / 30 characters; branch names unique, room names unique per branch |
-| Room size | 2-26 rows, 4-30 seats per row |
+| Room size | 2-26 rows, 4-30 seats per row, whole numbers only. Each one is checked as soon as it is typed and asked again if wrong. The room name is checked first (max 30 characters, not used yet in that branch; blank cancels) |
 | Movie | title max 60 characters and unique; genre from the list; rating G, PG, R-13, R-16, R-18; 1-600 minutes |
 | Showtime | `yyyy-MM-dd HH:mm`, not in the past, at most 365 days ahead, starts 9:00 AM-11:30 PM, no overlap (15-min cleaning gap) |
 | Regular seat price | PHP 100.00-2,000.00, at most 2 decimals (VIP seats add PHP 200) |

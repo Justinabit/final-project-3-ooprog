@@ -17,6 +17,7 @@ import cinema.service.MovieManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
 import cinema.util.Format;
+import cinema.util.Validator;
 
 // [Member A] Admin menu for branches, rooms and seats
 public class VenueMenu {
@@ -154,10 +155,17 @@ public class VenueMenu {
         }
         CinemaBranch branch = chooseBranch();
         if (branch == null) return;
-        String name = ConsoleReader.readLine("Room name: ");
-        int rows = ConsoleReader.readInt("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS + "): ");
-        int perRow = ConsoleReader.readInt("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
-                + VenueManager.MAX_SEATS_PER_ROW + "): ");
+        // each answer is checked right after it is typed, and asked again if it is wrong
+        String name = askRoomName(branch);
+        if (name == null) {
+            Screen.info("Cancelled. No room was added.");
+            return;
+        }
+        int rows = ConsoleReader.readNumber("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS
+                + ", lettered A-Z): ", "Rows", VenueManager.MIN_ROWS, VenueManager.MAX_ROWS);
+        int perRow = ConsoleReader.readNumber("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
+                + VenueManager.MAX_SEATS_PER_ROW + "): ", "Seats per row",
+                VenueManager.MIN_SEATS_PER_ROW, VenueManager.MAX_SEATS_PER_ROW);
         SeatLayoutStrategy layout = chooseLayout();
         if (layout == null) {
             Screen.info("Cancelled. No room was added.");
@@ -170,6 +178,25 @@ public class VenueMenu {
             printSeatMap(room);
         } catch (CinemaException e) {   // ValidationException or VenueException
             Screen.error(e.getMessage());
+        }
+    }
+
+    // Asks until the name is valid and not used by another room in this branch. Blank = cancel (returns null).
+    private String askRoomName(CinemaBranch branch) {
+        while (true) {
+            String name = ConsoleReader.readLine("Room name (blank to cancel): ");
+            if (name.isEmpty()) {
+                return null;
+            }
+            try {
+                Validator.validateRoomName(name);
+                if (!branch.hasRoomNamed(name, null)) {
+                    return name;
+                }
+                Screen.error("A room named '" + name + "' already exists in this branch.");
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
         }
     }
 
