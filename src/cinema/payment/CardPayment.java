@@ -9,6 +9,7 @@ public class CardPayment implements PaymentStrategy {
     public String getDisplayName() { return "Credit/Debit Card"; }
 
     public void pay(double amount) throws PaymentException {
+        PaymentStrategy.validateAmount(amount);
         String input = ConsoleReader.readLine("Enter 16-digit card number: ");
         String cardNumber = input.replaceAll("[ -]", "");   // allow "1234 5678 ..." or "1234-5678-..."
         if (!cardNumber.matches("\\d{16}")) {

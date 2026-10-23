@@ -105,19 +105,34 @@ public class BookingMenu {
             return;
         }
 
-        // Hold the seats first, then take the payment. If payment fails, release the seats.
+        // Hold the seats first, then take the payment. If ANYTHING stops us before the payment is saved
+        // (a failed payment, a price mismatch, an unexpected error), the finally block releases the seats
+        // and forgets the booking, so an unpaid booking can never stay in the system.
+        Booking booking = null;
+        boolean paid = false;
         try {
-            Booking booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, discount);
-            if (!takePayment(payment, booking.getTotalPrice())) {
-                BookingManager.getInstance().discardBooking(booking);
+            booking = BookingManager.getInstance().createBooking(customer, showtime, tickets, discount);
+            double charged = booking.getTotalPrice();
+            // The customer approved `total` above. We only charge that exact amount.
+            if (Double.compare(charged, total) != 0) {
+                Screen.error("The price changed while booking (" + Format.peso(total) + " -> "
+                        + Format.peso(charged) + "). Nothing was charged. Please try again.");
+                return;
+            }
+            if (!takePayment(payment, charged)) {
                 Screen.info("Booking cancelled; your seats were released.");
                 return;
             }
-            booking.setPayment(payment);
+            booking.recordPayment(payment, charged);   // saved only AFTER the payment succeeded
+            paid = true;
             Screen.success("Payment successful! Your booking is confirmed.");
             printETicket(booking);
         } catch (BookingException e) {
             Screen.error("Booking failed: " + e.getMessage());
+        } finally {
+            if (booking != null && !paid) {
+                BookingManager.getInstance().discardBooking(booking);
+            }
         }
     }
 
@@ -344,7 +359,10 @@ public class BookingMenu {
         if (booking.getDiscountAmount() > 0) {
             Screen.boxLeft("You saved   : " + Format.peso(booking.getDiscountAmount()));
         }
-        Screen.boxLeft("Amount Paid : " + Format.peso(booking.getTotalPrice()) + " (" + paidWith + ")");
+        Screen.boxLeft("Amount Paid : " + Format.peso(booking.getAmountPaid()) + " (" + paidWith + ")");
+        if (booking.isRefunded()) {
+            Screen.boxLeft("Refunded    : " + Format.peso(booking.getRefundedAmount()));
+        }
         Screen.boxLeft("Status      : " + booking.getStatus());
         Screen.boxDivider();
         Screen.boxLine("Please arrive 15 minutes before the show starts.");
