@@ -189,7 +189,7 @@ public class MovieMenu {
     private void addShowtime() {
         ArrayList<Movie> showing = new ArrayList<>();
         for (Movie m : movieManager.getMovies()) {
-            if ("NOW SHOWING".equals(m.getStatus())) showing.add(m);
+            if (m.isNowShowing()) showing.add(m);
         }
         if (showing.isEmpty()) {
             Screen.error("No NOW SHOWING movies. Add one first.");
@@ -258,8 +258,9 @@ public class MovieMenu {
             }
             System.out.println("  " + String.format("%-5s", s.getShowtimeId()) + " " + Format.shortDateTime(s.getStart())
                     + "   " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
-            System.out.println("        " + cinema + "   " + Format.peso(s.getBasePrice()) + "   "
-                    + s.getAvailableSeats().size() + "/" + s.getCapacity() + " seats left");
+            String seatsInfo = s.isFull() ? "SOLD OUT"
+                    : s.getAvailableSeatCount() + "/" + s.getCapacity() + " seats left";
+            System.out.println("        " + cinema + "   " + Format.peso(s.getBasePrice()) + "   " + seatsInfo);
         }
     }
 }
