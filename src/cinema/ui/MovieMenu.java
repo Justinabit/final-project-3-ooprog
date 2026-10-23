@@ -14,6 +14,7 @@ import cinema.service.MovieManager;
 import cinema.service.VenueManager;
 import cinema.util.ConsoleReader;
 import cinema.util.Format;
+import cinema.util.Validator;
 
 // [Member B] Browse catalog (customer) + manage movies and showtimes (admin)
 public class MovieMenu {
@@ -106,16 +107,32 @@ public class MovieMenu {
 
     private void addMovie() {
         String title = ConsoleReader.readLine("Title: ");
-        String genre = ConsoleReader.readLine("Genre: ");
+        String genre = readGenre();
         String rating = ConsoleReader.readLine("MTRCB rating (G, PG, R-13, R-16, R-18): ");
-        int duration = ConsoleReader.readInt("Duration in minutes: ");
+        int duration = ConsoleReader.readInt("Duration in minutes (1-600): ");
         String status = readStatus();
         try {
-            Movie movie = new Movie(movieManager.nextMovieId(), title, genre, rating, duration, status);
-            movieManager.addMovie(movie);
+            Movie movie = movieManager.createMovie(title, genre, rating, duration, status);
             Screen.success("Movie added with ID " + movie.getMovieId() + ".");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
+        }
+    }
+
+    // Genres come from a fixed list (Validator.GENRES), so they are always spelled the same way
+    private String readGenre() {
+        System.out.println("  Genres:");
+        for (int i = 0; i < Validator.GENRES.length; i++) {
+            System.out.print(String.format("   %2d %-12s", i + 1, Validator.GENRES[i]));
+            if ((i + 1) % 4 == 0) System.out.println();
+        }
+        System.out.println();
+        while (true) {
+            int choice = ConsoleReader.readInt("Genre number: ");
+            if (choice >= 1 && choice <= Validator.GENRES.length) {
+                return Validator.GENRES[choice - 1];
+            }
+            Screen.error("Please enter a number from 1 to " + Validator.GENRES.length + ".");
         }
     }
 
@@ -136,15 +153,15 @@ public class MovieMenu {
         try {
             switch (field) {
                 case 1: movieManager.renameMovie(m, ConsoleReader.readLine("New title: ")); break;
-                case 2: m.setGenre(ConsoleReader.readLine("New genre: ")); break;
+                case 2: m.setGenre(readGenre()); break;
                 case 3: m.setAgeRating(ConsoleReader.readLine("New MTRCB rating (G, PG, R-13, R-16, R-18): ")); break;
-                case 4: m.setDurationMinutes(ConsoleReader.readInt("New duration in minutes: ")); break;
+                case 4: movieManager.changeDuration(m, ConsoleReader.readInt("New duration in minutes (1-600): ")); break;
                 case 5: m.setStatus(readStatus()); break;
                 case 0: return;
                 default: Screen.error("Invalid choice."); return;
             }
             Screen.success("Updated: " + m);
-        } catch (ValidationException e) {
+        } catch (CinemaException e) {   // ValidationException, or BookingException for an overlapping duration
             Screen.error(e.getMessage());
         }
     }
@@ -175,11 +192,15 @@ public class MovieMenu {
             Screen.title("MANAGE SHOWTIMES (ADMIN)");
             Screen.option(1, "Add showtime");
             Screen.option(2, "View upcoming showtimes");
+            Screen.option(3, "Change a showtime's price");
+            Screen.option(4, "Cancel a showtime (refunds every booking)");
             Screen.option(0, "Back");
             int choice = Screen.readChoice();
             switch (choice) {
                 case 1: addShowtime(); break;
                 case 2: printShowtimes(movieManager.getUpcomingShowtimes(null)); break;
+                case 3: changePrice(); break;
+                case 4: cancelShowtime(); break;
                 case 0: back = true; break;
                 default: Screen.error("Invalid choice. Try again.");
             }
@@ -223,13 +244,61 @@ public class MovieMenu {
             Screen.error("That room has no seats.");
             return;
         }
+        Screen.info("Cinema hours: shows start between 9:00 AM and 11:30 PM, up to " + Validator.MAX_DAYS_AHEAD + " days ahead.");
         String dateTime = ConsoleReader.readLine("Date and time (yyyy-MM-dd HH:mm): ");
-        double price = ConsoleReader.readDouble("Regular seat price in PHP (VIP seats add " + Format.peso(VipSeat.EXTRA_CHARGE) + "): ");
+        double price = ConsoleReader.readAmount("Regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
+                + " - " + Format.peso(Validator.MAX_TICKET_PRICE) + "; VIP seats add " + Format.peso(VipSeat.EXTRA_CHARGE) + "): ");
         try {
-            Showtime s = new Showtime(movieManager.nextShowtimeId(), movie, room, dateTime, price);
-            movieManager.addShowtime(s);
+            Showtime s = movieManager.createShowtime(movie, room, dateTime, price);
             Screen.success("Showtime added with ID " + s.getShowtimeId() + ".");
         } catch (CinemaException e) {   // ValidationException or BookingException
+            Screen.error(e.getMessage());
+        }
+    }
+
+    // Picks one of the upcoming showtimes by its ID (null if not found)
+    private Showtime chooseUpcomingShowtime() {
+        ArrayList<Showtime> upcoming = movieManager.getUpcomingShowtimes(null);
+        if (upcoming.isEmpty()) {
+            Screen.info("No upcoming showtimes.");
+            return null;
+        }
+        printShowtimes(upcoming);
+        Showtime s = movieManager.findShowtime(ConsoleReader.readLine("Showtime ID (e.g. S-1): "));
+        if (s == null || !upcoming.contains(s)) {
+            Screen.error("Please choose one of the upcoming showtimes listed.");
+            return null;
+        }
+        return s;
+    }
+
+    // New bookings pay the new price; bookings already made keep what they paid
+    private void changePrice() {
+        Showtime s = chooseUpcomingShowtime();
+        if (s == null) return;
+        double price = ConsoleReader.readAmount("New regular seat price in PHP (" + Format.peso(Validator.MIN_TICKET_PRICE)
+                + " - " + Format.peso(Validator.MAX_TICKET_PRICE) + "): ");
+        try {
+            s.setBasePrice(price);
+            Screen.success("Price of " + s.getShowtimeId() + " changed to " + Format.peso(price) + ".");
+            Screen.info("Bookings that were already made keep the price they paid.");
+        } catch (ValidationException e) {
+            Screen.error(e.getMessage());
+        }
+    }
+
+    private void cancelShowtime() {
+        Showtime s = chooseUpcomingShowtime();
+        if (s == null) return;
+        if (!ConsoleReader.readYesNo("Cancel " + s.getMovie().getTitle() + " on " + Format.dateTime(s.getStart())
+                + " and refund every booking? (y/n): ")) {
+            Screen.info("The showtime was kept.");
+            return;
+        }
+        try {
+            int refunded = movieManager.cancelShowtime(s);
+            Screen.success("Showtime " + s.getShowtimeId() + " cancelled. " + refunded + " booking(s) were refunded.");
+        } catch (BookingException e) {
             Screen.error(e.getMessage());
         }
     }

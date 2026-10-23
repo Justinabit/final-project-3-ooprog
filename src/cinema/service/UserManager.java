@@ -1,5 +1,6 @@
 package cinema.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 
 import cinema.exception.LoginException;
@@ -7,38 +8,55 @@ import cinema.exception.ValidationException;
 import cinema.model.Admin;
 import cinema.model.Customer;
 import cinema.model.User;
+import cinema.util.Format;
 import cinema.util.Validator;
 
 // [Member A] Stores and manages all users (no Scanner / System.out here, just logic)
 public class UserManager {
     private ArrayList<User> users = new ArrayList<>();
-    private int idCounter = 0;
+    private int idCounter = 0;   // the number of the last ID given out (U-1, U-2, ...)
 
-    public String nextUserId() { return "U-" + (++idCounter); }
+    // The next ID is only used up when the account is really added (so a failed sign-up leaves no gap)
+    private String peekNextUserId() { return "U-" + (idCounter + 1); }
 
-    public void registerCustomer(String name, String email, String password, int age) throws ValidationException {
-        // The Customer constructor runs all the Validator checks
-        Customer customer = new Customer(nextUserId(), name, email, password, age);
+    public Customer registerCustomer(String name, String email, String password, LocalDate birthDate)
+            throws ValidationException {
+        Customer customer = new Customer(peekNextUserId(), name, email, password, birthDate);   // validates
         addUser(customer);
+        return customer;
     }
 
-    // An admin creates another admin account
-    public void registerAdmin(String name, String email, String password) throws ValidationException {
-        Admin admin = new Admin(nextUserId(), name, email, password);
+    public Admin registerAdmin(String name, String email, String username, String password) throws ValidationException {
+        Admin admin = new Admin(peekNextUserId(), name, email, password, username);   // validates
         addUser(admin);
+        return admin;
     }
 
-    // Used for registration and for adding the default admin
+    // Used for new accounts and for accounts loaded from the data file
     public void addUser(User user) throws ValidationException {
         if (isEmailTaken(user.getEmail(), null)) {
             throw new ValidationException("That email is already registered.");
         }
+        if (user instanceof Admin && isUsernameTaken(((Admin) user).getUsername())) {
+            throw new ValidationException("That username is already taken.");
+        }
+        int number = Integer.parseInt(user.getUserId().substring(2));   // "U-12" -> 12
         users.add(user);
+        if (number > idCounter) {
+            idCounter = number;
+        }
     }
 
     public boolean isEmailTaken(String email, User ignore) {
         for (User u : users) {
             if (u != ignore && u.getEmail().equalsIgnoreCase(email.trim())) return true;
+        }
+        return false;
+    }
+
+    public boolean isUsernameTaken(String username) {
+        for (User u : users) {
+            if (u instanceof Admin && ((Admin) u).getUsername().equalsIgnoreCase(username.trim())) return true;
         }
         return false;
     }
@@ -58,20 +76,34 @@ public class UserManager {
         user.setEmail(newEmail);
     }
 
-    public User login(String email, String password) throws LoginException {
+    // Customers use their email; admins can also use their username (see Admin.matchesLogin).
+    // After User.MAX_FAILED_LOGINS wrong passwords in a row the account is locked for a while.
+    public User login(String emailOrUsername, String password) throws LoginException {
         User found = null;
         for (User u : users) {
-            if (u.getEmail().equalsIgnoreCase(email.trim())) {
+            if (u.matchesLogin(emailOrUsername)) {
                 found = u;
                 break;
             }
         }
-        if (found == null || !found.checkPassword(password)) {
+        if (found == null) {
+            throw new LoginException("Invalid email or password.");
+        }
+        if (found.isLocked()) {
+            throw new LoginException("Too many wrong passwords. This account is locked until "
+                    + Format.shortDateTime(found.getLockedUntil()) + ".");
+        }
+        if (!found.checkPassword(password)) {
+            if (found.recordFailedLogin()) {
+                throw new LoginException("Too many wrong passwords. This account is now locked for "
+                        + User.LOCK_MINUTES + " minutes.");
+            }
             throw new LoginException("Invalid email or password.");
         }
         if (!found.isActive()) {
             throw new LoginException("This account has been deactivated. Please contact an admin.");
         }
+        found.unlock();   // a correct password clears the wrong-password count
         return found;
     }
 
@@ -94,9 +126,17 @@ public class UserManager {
         return result;
     }
 
+    public User findUser(String userId) {
+        for (User u : users) {
+            if (u.getUserId().equalsIgnoreCase(userId.trim())) return u;
+        }
+        return null;
+    }
+
     public Customer findCustomer(String userId) {
-        for (Customer c : getAllCustomers()) {
-            if (c.getUserId().equalsIgnoreCase(userId.trim())) return c;
+        User user = findUser(userId);
+        if (user instanceof Customer) {
+            return (Customer) user;
         }
         return null;
     }
@@ -107,10 +147,6 @@ public class UserManager {
         if (c == null) return false;
         c.setActive(active);
         return true;
-    }
-
-    public boolean deactivateCustomer(String userId) {
-        return setCustomerActive(userId, false);
     }
 
     public ArrayList<User> getAllUsers() { return users; }

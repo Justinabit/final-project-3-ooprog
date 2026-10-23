@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import cinema.exception.ValidationException;
 import cinema.exception.VenueException;
 import cinema.layout.SeatLayoutStrategy;
-import cinema.layout.StandardLayout;
 import cinema.model.Booking;
 import cinema.model.CinemaBranch;
 import cinema.model.CinemaRoom;
@@ -14,20 +13,28 @@ import cinema.util.Validator;
 
 // [Member A] Stores all branches. Others (Member B) use this to find rooms for showtimes.
 public class VenueManager {
+    public static final int MIN_ROWS = 2, MAX_ROWS = 26;                    // rows are letters A-Z
+    public static final int MIN_SEATS_PER_ROW = 4, MAX_SEATS_PER_ROW = 30;  // smaller rooms are not realistic
+
     private ArrayList<CinemaBranch> branches = new ArrayList<>();
     private int branchCounter = 0;
     private int roomCounter = 0;
 
-    public String nextBranchId() { return "BR-" + (++branchCounter); }
-    public String nextRoomId() { return "RM-" + (++roomCounter); }
+    private String nextBranchId() { return "BR-" + (++branchCounter); }
+    private String nextRoomId() { return "RM-" + (++roomCounter); }
 
     // ---------- branches ----------
 
+    // Used when loading the data file (new branches use createBranch)
     public void addBranch(CinemaBranch branch) throws ValidationException {
         if (isBranchNameTaken(branch.getBranchName(), null)) {
             throw new ValidationException("A branch named '" + branch.getBranchName() + "' already exists.");
         }
+        int number = Integer.parseInt(branch.getBranchId().substring(3));   // "BR-12" -> 12
         branches.add(branch);
+        if (number > branchCounter) {
+            branchCounter = number;
+        }
     }
 
     // Convenience for the menu: checks everything first, so an ID is only used when the branch is really added
@@ -79,12 +86,6 @@ public class VenueManager {
 
     // ---------- rooms ----------
 
-    // Default layout (last row VIP). Used by the sample data in Main.
-    public CinemaRoom addRoomToBranch(String branchId, String roomName, int rows, int seatsPerRow)
-            throws ValidationException, VenueException {
-        return addRoomToBranch(branchId, roomName, rows, seatsPerRow, new StandardLayout());
-    }
-
     // Validates, creates the room, generates seats with the chosen layout and adds it.
     public CinemaRoom addRoomToBranch(String branchId, String roomName, int rows, int seatsPerRow,
             SeatLayoutStrategy layout) throws ValidationException, VenueException {
@@ -96,12 +97,33 @@ public class VenueManager {
         if (branch.hasRoomNamed(roomName, null)) {
             throw new ValidationException("A room named '" + roomName.trim() + "' already exists in this branch.");
         }
-        Validator.validateRange("Rows", rows, 1, 26);          // rows are letters A-Z
-        Validator.validateRange("Seats per row", seatsPerRow, 1, 30);
+        Validator.validateRange("Rows", rows, MIN_ROWS, MAX_ROWS);
+        Validator.validateRange("Seats per row", seatsPerRow, MIN_SEATS_PER_ROW, MAX_SEATS_PER_ROW);
         CinemaRoom room = new CinemaRoom(nextRoomId(), roomName);
         room.generateSeats(rows, seatsPerRow, layout);
         branch.addRoom(room);
         return room;
+    }
+
+    // Used when loading the data file
+    public void addLoadedRoom(CinemaBranch branch, CinemaRoom room) throws ValidationException {
+        int number = Integer.parseInt(room.getRoomId().substring(3));   // "RM-12" -> 12
+        branch.addRoom(room);
+        if (number > roomCounter) {
+            roomCounter = number;
+        }
+    }
+
+    // A seat that is booked for a show that hasn't ended can't change type (the ticket says what it is)
+    public void changeSeatType(CinemaRoom room, String seatId, boolean makeVip, ArrayList<Showtime> showtimes)
+            throws ValidationException {
+        for (Showtime s : showtimes) {
+            if (s.getRoom() == room && !s.isCancelled() && !s.hasEnded() && s.isSeatTaken(seatId.trim())) {
+                throw new ValidationException("Seat " + seatId.trim().toUpperCase() + " is booked for the "
+                        + s.getDateTime() + " show. Change it after that show has ended.");
+            }
+        }
+        room.changeSeatType(seatId, makeVip);
     }
 
     // Room names must stay unique inside a branch
@@ -114,8 +136,8 @@ public class VenueManager {
         room.setRoomName(newName);
     }
 
-    // Same rule as removing a movie: not allowed while a showtime in this room that hasn't ended
-    // has confirmed bookings. Otherwise the room's showtimes are removed with it.
+    // Same rule as removing a movie: not allowed once a showtime in this room has bookings
+    // (so the saved booking history stays complete). Otherwise the room's showtimes are removed with it.
     // Returns how many showtimes were removed.
     public int removeRoom(String roomId, ArrayList<Showtime> showtimes) throws VenueException {
         CinemaRoom room = findRoom(roomId);
@@ -130,10 +152,9 @@ public class VenueManager {
 
     private void checkRoomCanBeRemoved(CinemaRoom room) throws VenueException {
         for (Booking b : BookingManager.getInstance().getAllBookings()) {
-            if (b.getShowtime().getRoom() == room && "CONFIRMED".equals(b.getStatus())
-                    && !b.getShowtime().hasEnded()) {
+            if (b.getShowtime().getRoom() == room) {
                 throw new VenueException("Cannot remove '" + room.getRoomName()
-                        + "': it has upcoming showtimes with confirmed bookings. Cancel those bookings first.");
+                        + "': it has bookings on record, which must be kept.");
             }
         }
     }
@@ -170,6 +191,15 @@ public class VenueManager {
             if (b.getRooms().contains(room)) return b;
         }
         return null;
+    }
+
+    // "SM City Lipa - Cinema 1"
+    public String getCinemaName(CinemaRoom room) {
+        CinemaBranch branch = findBranchOfRoom(room);
+        if (branch == null) {
+            return room.getRoomName();
+        }
+        return branch.getBranchName() + " - " + room.getRoomName();
     }
 
     public ArrayList<CinemaBranch> getBranches() { return branches; }

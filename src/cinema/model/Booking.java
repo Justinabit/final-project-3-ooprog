@@ -88,9 +88,14 @@ public class Booking {
         this.paidAt = LocalDateTime.now();
     }
 
-    // Kept so existing callers still work: it records a full payment of the booking total.
-    public void setPayment(PaymentStrategy payment) {
-        recordPayment(payment, totalPrice);
+    // Used only when loading a saved booking from the data file: the payment already happened at paidAt.
+    public void loadPayment(PaymentStrategy payment, LocalDateTime paidAt) {
+        if (payment == null || paidAt == null) {
+            throw new IllegalArgumentException("A saved payment needs a method and a date.");
+        }
+        this.payment = payment;
+        this.amountPaid = totalPrice;
+        this.paidAt = paidAt;
     }
 
     public void cancel() { this.status = "CANCELLED"; }

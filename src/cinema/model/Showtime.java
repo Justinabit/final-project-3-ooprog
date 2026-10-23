@@ -5,7 +5,6 @@ import java.util.ArrayList;
 
 import cinema.exception.BookingException;
 import cinema.exception.ValidationException;
-import cinema.util.Format;
 import cinema.util.Validator;
 
 // [Member B] A movie playing in a room at a certain time.
@@ -16,6 +15,7 @@ public class Showtime {
     private CinemaRoom room;       // from Member A
     private LocalDateTime start;   // parsed from text like "2026-11-20 18:30"
     private double basePrice;
+    private boolean cancelled = false;   // an admin cancelled this screening (its bookings were refunded)
     private ArrayList<String> heldOrBookedSeatIds = new ArrayList<>();
 
     public Showtime(String showtimeId, Movie movie, CinemaRoom room, String dateTime, double basePrice)
@@ -35,6 +35,14 @@ public class Showtime {
     public LocalDateTime getStart() { return start; }
     public LocalDateTime getEnd() { return start.plusMinutes(movie.getDurationMinutes()); }
     public String getDateTime() { return start.format(Validator.DATE_TIME_FORMAT); }
+    public boolean isCancelled() { return cancelled; }
+    public void cancel() { cancelled = true; }
+
+    // New bookings use the new price; bookings already made keep what they paid
+    public void setBasePrice(double basePrice) throws ValidationException {
+        Validator.validatePrice(basePrice);
+        this.basePrice = basePrice;
+    }
     public boolean hasStarted() { return !start.isAfter(LocalDateTime.now()); }
     public boolean hasEnded() { return !getEnd().isAfter(LocalDateTime.now()); }
 
@@ -43,14 +51,6 @@ public class Showtime {
             if (id.equalsIgnoreCase(seatId)) return true;
         }
         return false;
-    }
-
-    public ArrayList<Seat> getAvailableSeats() {
-        ArrayList<Seat> available = new ArrayList<>();
-        for (Seat seat : room.getSeats()) {
-            if (!isSeatTaken(seat.getSeatNumber())) available.add(seat);
-        }
-        return available;
     }
 
     public int getSeatsTakenCount() { return heldOrBookedSeatIds.size(); }
@@ -86,8 +86,4 @@ public class Showtime {
         }
     }
 
-    public String describe(String branchName) {
-        return showtimeId + " | " + movie.getTitle() + " | " + (branchName == null ? "" : branchName + " - ")
-                + room.getRoomName() + " | " + Format.shortDateTime(start) + " | " + Format.peso(basePrice);
-    }
 }

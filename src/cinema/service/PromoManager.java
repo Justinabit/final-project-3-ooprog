@@ -1,5 +1,6 @@
 package cinema.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 
 import cinema.exception.ValidationException;
@@ -10,13 +11,22 @@ import cinema.util.Validator;
 public class PromoManager {
     private ArrayList<Promo> promos = new ArrayList<>();
 
-    public void addPromo(String code, int percentOff) throws ValidationException {
+    // A new promo code from the admin (or the sample data)
+    public void addPromo(String code, int percentOff, LocalDate validUntil) throws ValidationException {
         Validator.validatePromoCode(code);
         Validator.validateRange("Discount percent", percentOff, 1, 90);
-        if (findPromo(code) != null) {
-            throw new ValidationException("Promo code " + code.toUpperCase() + " already exists.");
+        if (validUntil == null || validUntil.isBefore(LocalDate.now())) {
+            throw new ValidationException("The promo end date cannot be in the past.");
         }
-        promos.add(new Promo(code, percentOff));
+        restorePromo(new Promo(code, percentOff, validUntil));
+    }
+
+    // Adds a promo loaded from the data file (it may already be expired, which is fine for history)
+    public void restorePromo(Promo promo) throws ValidationException {
+        if (findPromo(promo.getCode()) != null) {
+            throw new ValidationException("Promo code " + promo.getCode() + " already exists.");
+        }
+        promos.add(promo);
     }
 
     public boolean removePromo(String code) {
