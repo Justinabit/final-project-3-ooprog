@@ -55,8 +55,11 @@ public class Showtime {
 
     public int getSeatsTakenCount() { return heldOrBookedSeatIds.size(); }
     public int getCapacity() { return room.getSeats().size(); }
+    public int getAvailableSeatCount() { return getCapacity() - getSeatsTakenCount(); }
+    public boolean isFull() { return getAvailableSeatCount() <= 0; }
 
     public Seat findSeat(String seatId) {
+        if (seatId == null) return null;
         for (Seat seat : room.getSeats()) {
             if (seat.getSeatNumber().equalsIgnoreCase(seatId.trim())) return seat;
         }
