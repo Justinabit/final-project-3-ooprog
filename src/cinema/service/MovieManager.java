@@ -66,7 +66,7 @@ public class MovieManager {
         if (!movies.contains(showtime.getMovie())) {
             throw new BookingException("That movie is not in the catalog.");
         }
-        if (!"NOW SHOWING".equals(showtime.getMovie().getStatus())) {
+        if (!showtime.getMovie().isNowShowing()) {
             throw new BookingException("Only NOW SHOWING movies can be scheduled.");
         }
         if (showtime.getStart().isBefore(LocalDateTime.now())) {
@@ -87,6 +87,7 @@ public class MovieManager {
     }
 
     public Showtime findShowtime(String showtimeId) {
+        if (showtimeId == null) return null;
         for (Showtime s : showtimes) {
             if (s.getShowtimeId().equalsIgnoreCase(showtimeId.trim())) return s;
         }
@@ -94,6 +95,7 @@ public class MovieManager {
     }
 
     public Movie findMovie(String movieId) {
+        if (movieId == null) return null;
         for (Movie m : movies) {
             if (m.getMovieId().equalsIgnoreCase(movieId.trim())) return m;
         }
