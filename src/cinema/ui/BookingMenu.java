@@ -78,7 +78,8 @@ public class BookingMenu {
                     if (showtime == null) return;
                 } else if (step == 3) {
                     Screen.section("STEP 3 OF 5: CHOOSE YOUR SEATS");
-                    System.out.println("  " + movie.getTitle() + "  |  " + cinemaName(showtime) + "  |  "
+                    System.out.println("  " + Format.shorten(movie.getTitle(), 73));
+                    System.out.println("  " + Format.shorten(cinemaName(showtime), 42) + "  |  "
                             + Format.dateTime(showtime.getStart()));
                     SeatMap.print(showtime.getRoom(), showtime);
                     seats = chooseSeats(showtime);
@@ -200,8 +201,8 @@ public class BookingMenu {
         Screen.section("STEP 1 OF 5: CHOOSE A MOVIE");
         for (int i = 0; i < movies.size(); i++) {
             Movie m = movies.get(i);
-            Screen.option(i + 1, String.format("%-28s %-9s %-5s %s", m.getTitle(), m.getGenre(),
-                    m.getAgeRating(), m.getRuntime()));
+            Screen.option(i + 1, Format.fit(m.getTitle(), 32) + "  " + Format.fit(m.getGenre(), 11) + "  "
+                    + Format.fit(m.getAgeRating(), 4) + "  " + m.getRuntime());
         }
         Screen.option(0, "Cancel");
         while (true) {
@@ -222,7 +223,8 @@ public class BookingMenu {
     // STEP 2: schedules grouped by branch, numbered in the order they are shown
     private Showtime chooseShowtime(Movie movie) {
         Screen.section("STEP 2 OF 5: CHOOSE A SCHEDULE");
-        System.out.println("  " + movie.getTitle() + "  (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
+        System.out.println("  " + Format.shorten(movie.getTitle(), 56) + "  (" + movie.getAgeRating() + ", "
+                + movie.getRuntime() + ")");
         ArrayList<Showtime> numbered = new ArrayList<>();
         for (CinemaBranch branch : venueManager.getBranches()) {
             boolean branchPrinted = false;
@@ -230,7 +232,7 @@ public class BookingMenu {
                 if (venueManager.findBranchOfRoom(s.getRoom()) != branch) continue;
                 if (!branchPrinted) {
                     System.out.println();
-                    System.out.println("  " + branch.getBranchName() + "  -  " + branch.getLocation());
+                    System.out.println("  " + Format.shorten(branch.getBranchName() + "  -  " + branch.getLocation(), 73));
                     branchPrinted = true;
                 }
                 numbered.add(s);
@@ -239,8 +241,8 @@ public class BookingMenu {
                     seatsLeft = "SOLD OUT";
                 }
                 Screen.option(numbered.size(), Format.shortDateTime(s.getStart()) + "   "
-                        + String.format("%-10s", s.getRoom().getRoomName()) + "   "
-                        + Format.peso(s.getBasePrice()) + "   " + seatsLeft);
+                        + Format.fit(s.getRoom().getRoomName(), 12) + "  "
+                        + Format.fitRight(Format.peso(s.getBasePrice()), 12) + "  " + seatsLeft);
             }
         }
         Screen.option(0, "Cancel");
@@ -391,26 +393,32 @@ public class BookingMenu {
     // STEP 5: receipt-style summary. Returns the total to pay.
     private double printOrderSummary(Showtime showtime, ArrayList<Ticket> tickets, DiscountStrategy discount) {
         Movie movie = showtime.getMovie();
-        System.out.println("  Movie    : " + movie.getTitle() + " (" + movie.getAgeRating() + ", " + movie.getRuntime() + ")");
-        System.out.println("  Cinema   : " + cinemaName(showtime));
+        System.out.println("  Movie    : " + Format.shorten(movie.getTitle(), 45) + " (" + movie.getAgeRating() + ", "
+                + movie.getRuntime() + ")");
+        System.out.println("  Cinema   : " + Format.shorten(cinemaName(showtime), 62));
         System.out.println("  Schedule : " + Format.dateTime(showtime.getStart()));
         Screen.line();
         for (Ticket t : tickets) {
-            System.out.println(String.format("    %-6s %-10s %-22s %15s", t.getSeat().getSeatNumber(),
-                    t.getSeat().getSeatType(), t.getTicketType(),
-                    Format.peso(BookingManager.round2(t.calculatePrice()))));
+            System.out.println("    " + Format.fit(t.getSeat().getSeatNumber(), 6) + " "
+                    + Format.fit(t.getSeat().getSeatType(), 10) + " " + Format.fit(t.getTicketType(), 22) + " "
+                    + Format.fitRight(Format.peso(BookingManager.round2(t.calculatePrice())), 15));
         }
         double subtotal = BookingManager.calculateSubtotal(tickets);
         double total = BookingManager.calculateTotal(tickets, discount);
         Screen.line();
-        System.out.println(String.format("  %-42s %15s", "Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal)));
+        printSummaryLine("Subtotal (" + tickets.size() + " ticket/s)", Format.peso(subtotal));
         if (total < subtotal) {
-            System.out.println(String.format("  %-42s %15s", "Less: " + discount.getName(),
-                    "- " + Format.peso(BookingManager.round2(subtotal - total))));
+            // a PWD discount shows the ID number, so this label can be long
+            printSummaryLine("Less: " + discount.getName(), "- " + Format.peso(BookingManager.round2(subtotal - total)));
         }
-        System.out.println(String.format("  %-42s %15s", "TOTAL", Format.peso(total)));
+        printSummaryLine("TOTAL", Format.peso(total));
         System.out.println("  All prices are VAT-inclusive.");
         return total;
+    }
+
+    // One "label ...... amount" line of the summary; the amounts line up on the right
+    private void printSummaryLine(String label, String amount) {
+        System.out.println("  " + Format.fit(label, 42) + " " + Format.fitRight(amount, 15));
     }
 
     // STRATEGY PATTERN: each choice gives a different PaymentStrategy. Returns null if cancelled.
@@ -459,7 +467,7 @@ public class BookingMenu {
         Screen.boxLine("C U R A T O R    E - T I C K E T");
         Screen.boxDivider();
         Screen.boxLeft("Booking Ref : " + booking.getBookingId());
-        Screen.boxLeft("Movie       : " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
+        Screen.boxLeft("Movie       : " + Format.shorten(s.getMovie().getTitle(), 48) + " (" + s.getMovie().getAgeRating() + ")");
         Screen.boxLeft("Cinema      : " + cinemaName(s));
         Screen.boxLeft("Schedule    : " + Format.dateTime(s.getStart()));
         Screen.boxLeft("Seats       : " + seatListWithTypes(booking.getSeats()));
@@ -493,9 +501,9 @@ public class BookingMenu {
             }
             for (int i = 0; i < mine.size(); i++) {
                 Booking b = mine.get(i);
-                Screen.option(i + 1, String.format("%-10s %-25s %-21s %s", b.getBookingId(),
-                        b.getShowtime().getMovie().getTitle(), Format.shortDateTime(b.getShowtime().getStart()),
-                        b.getStatus()));
+                Screen.option(i + 1, Format.fit(b.getBookingId(), 10) + "  "
+                        + Format.fit(b.getShowtime().getMovie().getTitle(), 21) + "  "
+                        + Format.shortDateTime(b.getShowtime().getStart()) + "  " + b.getStatus());
             }
             Screen.option(0, "Back");
             int choice = Screen.readMenuChoice(mine.size());
@@ -576,15 +584,7 @@ public class BookingMenu {
                         addPromo();
                         break;
                     case 2:
-                        if (promoManager.getPromos().isEmpty()) Screen.info("No promo codes.");
-                        for (Promo p : promoManager.getPromos()) {
-                            String state = "valid until " + Format.date(p.getValidUntil());
-                            if (p.isExpired()) {
-                                state = "EXPIRED on " + Format.date(p.getValidUntil());
-                            }
-                            System.out.println(String.format("  %-15s %3d%% off   %-26s used by %d customer(s)",
-                                    p.getCode(), p.getPercentOff(), state, p.getUsedBy().size()));
-                        }
+                        printPromos();
                         break;
                     case 3:
                         if (promoManager.removePromo(ConsoleReader.readLine("Code to remove: "))) {
@@ -599,6 +599,23 @@ public class BookingMenu {
             } catch (GoBackException e) {
                 Screen.backTo("Manage Promo Codes");
             }
+        }
+    }
+
+    private void printPromos() {
+        if (promoManager.getPromos().isEmpty()) {
+            Screen.info("No promo codes.");
+            return;
+        }
+        Table table = new Table(15, 4, 24, 16);
+        table.alignRight(1);
+        table.printHeader("CODE", "OFF", "STATUS", "USED BY");
+        for (Promo p : promoManager.getPromos()) {
+            String state = "valid until " + Format.date(p.getValidUntil());
+            if (p.isExpired()) {
+                state = "EXPIRED on " + Format.date(p.getValidUntil());
+            }
+            table.printRow(p.getCode(), p.getPercentOff() + "%", state, p.getUsedBy().size() + " customer(s)");
         }
     }
 

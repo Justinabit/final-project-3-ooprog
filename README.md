@@ -22,8 +22,9 @@ src/cinema/
 │                    CinemaRoom, CinemaBranch, Booking, Ticket, RegularTicket, StudentTicket, Promo
 ├── service/         the rules (no Scanner / System.out): UserManager, MovieManager, VenueManager, PromoManager,
 │                    BookingManager (Singleton), ReportService
-├── ui/              the screens: Screen (shared look + welcome screen), SeatMap, AccountMenu, MovieMenu,
-│                    VenueMenu, BookingMenu, RecordsMenu (admin: users, bookings, transactions, data files)
+├── ui/              the screens: Screen (shared look + welcome screen), Table (lined-up columns), SeatMap,
+│                    AccountMenu, MovieMenu, VenueMenu, BookingMenu, RecordsMenu (admin: users, bookings,
+│                    transactions, data files)
 ├── data/            everything that reads or writes files: FileManager, SampleData (first run only),
 │                    TransactionLog (payments and refunds), ErrorLog (unexpected errors)
 ├── payment/         PaymentStrategy, CashPayment, CardPayment, EWalletPayment (GCash / Maya)
@@ -32,7 +33,8 @@ src/cinema/
 ├── layout/          SeatLayoutStrategy, StandardLayout, PremiumLayout, EconomyLayout
 ├── exception/       CinemaException + Validation / Login / Booking / Payment / Venue / DataException,
 │                    GoBackException (not an error: the user typed /return)
-└── util/            Validator (every input rule), ConsoleReader (keyboard input), Format (pesos and dates)
+└── util/            Validator (every input rule), ConsoleReader (keyboard input), Format (pesos, dates and
+                     fitting text into a column)
 ```
 
 ## Going back with /return
@@ -55,6 +57,7 @@ catches it (`catch (GoBackException e)`) and shows itself again. Menus use `Scre
 | Saved data is missing or wrong | the `data/*.txt` files - each starts with a `#` line naming the columns |
 | A payment or refund needs checking | `data/transactions.txt` (one line per payment / refund, never changed) |
 | "Something went wrong" appeared | `data/error.log` - the time and the full Java error with the line number |
+| A table's columns don't line up | `ui/Table.java` (column widths are the numbers in `new Table(...)`) and `Format.fit` |
 | A data file was edited by hand and broke | the program skips the bad line, says which one, and keeps a copy as `<file>.bak` |
 
 To start over with fresh sample data, close CURATOR and delete the `data` folder.
@@ -74,7 +77,7 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 - Abstraction: abstract User, Seat, Ticket and PercentageDiscount, plus the strategy interfaces
 - Inheritance: Admin/Customer extend User, StandardSeat/VipSeat extend Seat, RegularTicket/StudentTicket extend Ticket,
   the discounts extend PercentageDiscount
-- Polymorphism: getRole(), getDetails(), matchesLogin(), getExtraCharge(), isVipRow(), calculatePrice(), pay(), applyDiscount()
+- Polymorphism: getRole(), getTableRow(), matchesLogin(), getExtraCharge(), isVipRow(), calculatePrice(), pay(), applyDiscount()
 - Exceptions: CinemaException -> Validation / Login / Booking / Payment / Venue / Data. GoBackException carries /return
   back to the previous screen. File errors become DataException,
   unexpected errors are caught in Main and written to `data/error.log` instead of crashing
@@ -86,6 +89,7 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 - Keep Scanner / System.out in the `ui` classes; keep `service` classes as plain logic.
 - Put new input rules in `Validator` so every screen uses the same limits.
 - Use `Screen` for titles, options and messages, `Format.peso(...)` for money and `Format.dateTime(...)` for dates.
+- Use `Table` for lists with columns, so long text is cut the same way everywhere (keep a line at 75 characters or less).
 - Don't rename methods others use without telling the team.
 
 ## Sample data (created on the first run)
@@ -133,6 +137,9 @@ Shared: Main, the `data/` package, RecordsMenu, Screen, SeatMap, Format and the 
 - Booking: movie -> schedule (grouped by branch) -> seats on the seat map -> ticket type and discount ->
   review and pay -> e-ticket with a booking reference (CUR-100001...).
 - Seat map: `[A1 ]` regular, `{E1 }` VIP, `[XX ]` taken. VIP seats cost PHP 200 more.
+- Tables (users, movies, bookings, transactions, reports...) have fixed column widths, so the columns always line up.
+  A value that is too long is cut and ends with `...` (`Ma. Cristina Josefina Dela Paz-Santos` -> `Ma. Cristina...`).
+  The full value is still saved, and shown in full where there is room (for example in My Profile).
 - Price = sum of each seat's price, then ONE discount for the whole booking (student tickets get only the student discount;
   otherwise promo code, senior citizen 60+, or PWD). Prices are VAT-inclusive.
 - Seats are held first, then payment is taken (3 attempts). If payment fails, the seats are released and nothing is kept.

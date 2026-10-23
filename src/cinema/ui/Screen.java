@@ -2,6 +2,7 @@ package cinema.ui;
 
 import cinema.exception.GoBackException;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 
 // Shared look for every screen: the welcome banner, titles, menu options and messages.
 // All menus call these methods so the whole program has the same design.
@@ -41,7 +42,7 @@ public class Screen {
         filmStrip();
         border();
         System.out.println();
-        System.out.println(spaces(12) + "Tip: type " + ConsoleReader.RETURN_COMMAND
+        System.out.println(spaces(5) + "Tip: type " + ConsoleReader.RETURN_COMMAND
                 + " at any prompt to go back to the previous screen.");
         try {
             ConsoleReader.readLine(spaces(23) + "Press Enter to continue...");
@@ -70,6 +71,7 @@ public class Screen {
 
     // Smaller heading inside a screen, for example "SUMMARY"
     public static void section(String text) {
+        text = Format.shorten(text, WIDTH - 9);   // a long movie title or name ends with "..."
         System.out.println();
         System.out.println(" --- " + text + " " + repeat("-", WIDTH - 5 - text.length()));
     }
@@ -132,13 +134,10 @@ public class Screen {
         System.out.println(" |" + repeat("-", WIDTH - 2) + "|");
     }
 
-    // Prints text on the left side between two "|" walls (long text is cut off)
+    // Prints text on the left side between two "|" walls (long text is cut and ends with "...")
     public static void boxLeft(String text) {
-        int inside = WIDTH - 4;
-        if (text.length() > inside) {
-            text = text.substring(0, inside);
-        }
-        System.out.println(" |  " + text + spaces(inside - text.length()) + "|");
+        int inside = WIDTH - 5;
+        System.out.println(" |  " + Format.fit(text, inside) + " |");
     }
 
     // ---------- small helpers ----------

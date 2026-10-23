@@ -74,14 +74,16 @@ public class VenueMenu {
         int roomCount = 0;
         int seatCount = 0;
         for (CinemaBranch b : venueManager.getBranches()) {
-            System.out.println("  " + b.getBranchId() + "  " + b.getBranchName() + "  (" + b.getLocation() + ")");
+            // long names and locations are cut with "..." so every line fits the screen
+            System.out.println("  " + b.getBranchId() + "  "
+                    + Format.shorten(b.getBranchName() + "  (" + b.getLocation() + ")", 64));
             if (b.getRooms().isEmpty()) {
-                System.out.println("      (no rooms yet)");
+                System.out.println("    (no rooms yet)");
             }
             for (CinemaRoom r : b.getRooms()) {
-                System.out.println(String.format("      %-6s %-14s %2d x %-2d  %3d seats (%d VIP)   %d upcoming show(s)",
-                        r.getRoomId(), r.getRoomName(), r.getRows(), r.getSeatsPerRow(),
-                        r.getSeats().size(), r.getVipSeatCount(), countUpcomingShows(r)));
+                System.out.println("    " + Format.fit(r.getRoomId(), 6) + " " + Format.fit(r.getRoomName(), 14)
+                        + String.format(" %2d x %-2d  %3d seats (%d VIP)  %d upcoming show(s)", r.getRows(),
+                        r.getSeatsPerRow(), r.getSeats().size(), r.getVipSeatCount(), countUpcomingShows(r)));
                 roomCount++;
             }
             seatCount += b.getTotalSeats();
@@ -275,7 +277,8 @@ public class VenueMenu {
         boolean anyRoom = false;
         for (CinemaBranch b : venueManager.getBranches()) {
             for (CinemaRoom r : b.getRooms()) {
-                System.out.println("  " + r.getRoomId() + "  " + b.getBranchName() + " - " + r.getRoomName());
+                System.out.println("  " + Format.fit(r.getRoomId(), 6) + "  "
+                        + Format.shorten(b.getBranchName() + " - " + r.getRoomName(), 65));
                 anyRoom = true;
             }
         }

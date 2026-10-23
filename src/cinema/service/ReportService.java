@@ -9,6 +9,7 @@ import java.util.Map;
 import cinema.model.Booking;
 import cinema.model.Showtime;
 import cinema.ui.Screen;
+import cinema.ui.Table;
 import cinema.util.Format;
 
 // [Member D] Reports for the admin. Read data from BookingManager.getInstance().
@@ -71,23 +72,28 @@ public class ReportService {
             System.out.println("  Bookings without a payment record (not counted): " + awaitingPayment);
         }
         Screen.section("SALES");
-        System.out.println(String.format("  %-42s %s", "Gross ticket sales", money(gross)));
-        System.out.println(String.format("  %-42s %s", "Less: discounts given", "- " + money(discounts)));
-        System.out.println(String.format("  %-42s %s", "Total revenue (net, paid)", money(net)));
-        System.out.println(String.format("  %-42s %s", "Refunded for cancelled bookings", money(refunded)));
+        printLine("Gross ticket sales", money(gross));
+        printLine("Less: discounts given", "- " + money(discounts));
+        printLine("Total revenue (net, paid)", money(net));
+        printLine("Refunded for cancelled bookings", money(refunded));
 
         if (!byMovie.isEmpty()) {
             Screen.section("REVENUE BY MOVIE");
             for (Map.Entry<String, BigDecimal> e : byMovie.entrySet()) {
-                System.out.printf("  %-42s %s%n", e.getKey(), money(e.getValue()));
+                printLine(e.getKey(), money(e.getValue()));
             }
         }
         if (!byMethod.isEmpty()) {
             Screen.section("REVENUE BY PAYMENT METHOD");
             for (Map.Entry<String, BigDecimal> e : byMethod.entrySet()) {
-                System.out.printf("  %-42s %s%n", e.getKey(), money(e.getValue()));
+                printLine(e.getKey(), money(e.getValue()));
             }
         }
+    }
+
+    // "label ...... amount". A long movie title is cut with "..." so the amounts stay in one column.
+    private void printLine(String label, String amount) {
+        System.out.println("  " + Format.fit(label, 42) + " " + Format.fitRight(amount, 18));
     }
 
     public void showAttendanceReport() {
@@ -109,13 +115,16 @@ public class ReportService {
             return;
         }
         System.out.println("  Total tickets sold (confirmed): " + totalTicketsSold);
-        Screen.info("Counts every confirmed booking, including shows that have not started yet.");
+        Screen.info("Includes confirmed bookings for shows that have not started yet.");
 
         // Earliest showtime first
         List<Map.Entry<Showtime, Integer>> rows = new ArrayList<>(perShowtime.entrySet());
         rows.sort((a, b) -> a.getKey().getStart().compareTo(b.getKey().getStart()));
 
         Screen.section("PER SHOWTIME");
+        Table table = new Table(6, 25, 21, 7, 6);
+        table.alignRight(3, 4);
+        table.printHeader("ID", "MOVIE", "DATE AND TIME", "SOLD", "FILLED");
         for (Map.Entry<Showtime, Integer> e : rows) {
             Showtime s = e.getKey();
             int capacity = s.getCapacity();
@@ -123,8 +132,8 @@ public class ReportService {
             if (capacity > 0) {
                 percent = 100.0 * e.getValue() / capacity;
             }
-            System.out.printf("  %s | %s | %s | %d/%d seats (%.0f%%)%n", s.getShowtimeId(), s.getMovie().getTitle(),
-                    Format.shortDateTime(s.getStart()), e.getValue(), capacity, percent);
+            table.printRow(s.getShowtimeId(), s.getMovie().getTitle(), Format.shortDateTime(s.getStart()),
+                    e.getValue() + "/" + capacity, String.format("%.0f%%", percent));
         }
     }
 }

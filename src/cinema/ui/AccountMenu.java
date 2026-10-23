@@ -235,11 +235,7 @@ public class AccountMenu {
 
     private void listAllAccounts() {
         Screen.section("ALL ACCOUNTS");
-        printTableHeader();
-        for (User user : userManager.getAllUsers()) {
-            // Admin and Customer each describe themselves (POLYMORPHISM)
-            System.out.println("  " + user.getDetails());
-        }
+        printAccounts(userManager.getAllUsers());
         System.out.println("  Total: " + userManager.getAllUsers().size() + " account(s)");
     }
 
@@ -251,10 +247,7 @@ public class AccountMenu {
             return;
         }
         Screen.section("SEARCH RESULTS");
-        printTableHeader();
-        for (Customer customer : found) {
-            System.out.println("  " + customer.getDetails());
-        }
+        printAccounts(new ArrayList<User>(found));
     }
 
     private void changeCustomerStatus(boolean active) {
@@ -338,9 +331,14 @@ public class AccountMenu {
         return customer;
     }
 
-    private void printTableHeader() {
-        System.out.println("  " + String.format(User.TABLE_FORMAT, "ID", "NAME", "EMAIL", "ROLE", "STATUS") + "AGE");
-        Screen.line();
+    // The accounts table, also used by RecordsMenu. A name or email that is too long ends with "...".
+    public static void printAccounts(ArrayList<User> users) {
+        Table table = new Table(6, 16, 19, 8, 11, 3);
+        table.printHeader("ID", "NAME", "EMAIL", "ROLE", "STATUS", "AGE");
+        for (User user : users) {
+            // Admin and Customer each give their own row (POLYMORPHISM)
+            table.printRow(user.getTableRow());
+        }
     }
 
     private String statusText(boolean active) {

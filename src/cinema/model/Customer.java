@@ -34,9 +34,11 @@ public class Customer extends User {
         this.birthDate = birthDate;
     }
 
-    // Same row as every User, plus the age at the end (POLYMORPHISM: overrides User.getDetails)
+    // Same row as every User, plus the age in the last column (POLYMORPHISM: overrides User.getTableRow)
     @Override
-    public String getDetails() {
-        return super.getDetails() + getAge();
+    public String[] getTableRow() {
+        String[] row = super.getTableRow();
+        row[5] = String.valueOf(getAge());
+        return row;
     }
 }

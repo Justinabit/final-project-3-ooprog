@@ -243,7 +243,8 @@ public class MovieMenu {
         boolean anyRoom = false;
         for (CinemaBranch b : venueManager.getBranches()) {
             for (CinemaRoom r : b.getRooms()) {
-                System.out.println("  " + r.getRoomId() + " | " + b.getBranchName() + " - " + r.getRoomName()
+                System.out.println("  " + Format.fit(r.getRoomId(), 6) + " | "
+                        + Format.shorten(b.getBranchName() + " - " + r.getRoomName(), 50)
                         + " (" + r.getSeats().size() + " seats)");
                 anyRoom = true;
             }
@@ -325,12 +326,14 @@ public class MovieMenu {
             Screen.info("No movies found.");
             return;
         }
-        System.out.println("  " + String.format(Movie.TABLE_FORMAT, "ID", "TITLE", "GENRE", "RATED", "RUNTIME", "STATUS"));
-        Screen.line();
-        for (Movie m : list) System.out.println("  " + m);
+        Table table = new Table(5, 25, 11, 5, 6, 11);
+        table.printHeader("ID", "TITLE", "GENRE", "RATED", "LENGTH", "STATUS");
+        for (Movie m : list) {
+            table.printRow(m.getMovieId(), m.getTitle(), m.getGenre(), m.getAgeRating(), m.getRuntime(), m.getStatus());
+        }
     }
 
-    // Two lines per showtime: when and what, then where, price and seats left
+    // Two lines per showtime: when and what, then where, price and seats left. Long titles end with "...".
     private void printShowtimes(ArrayList<Showtime> list) {
         if (list.isEmpty()) {
             Screen.info("No upcoming showtimes.");
@@ -342,11 +345,12 @@ public class MovieMenu {
             if (b != null) {
                 cinema = b.getBranchName() + " - " + cinema;
             }
-            System.out.println("  " + String.format("%-5s", s.getShowtimeId()) + " " + Format.shortDateTime(s.getStart())
-                    + "   " + s.getMovie().getTitle() + " (" + s.getMovie().getAgeRating() + ")");
+            System.out.println("  " + Format.fit(s.getShowtimeId(), 6) + " " + Format.shortDateTime(s.getStart())
+                    + "   " + Format.shorten(s.getMovie().getTitle(), 35) + " (" + s.getMovie().getAgeRating() + ")");
             String seatsInfo = s.isFull() ? "SOLD OUT"
                     : s.getAvailableSeatCount() + "/" + s.getCapacity() + " seats left";
-            System.out.println("        " + cinema + "   " + Format.peso(s.getBasePrice()) + "   " + seatsInfo);
+            System.out.println("        " + Format.shorten(cinema, 30) + "   " + Format.peso(s.getBasePrice())
+                    + "   " + seatsInfo);
         }
     }
 }

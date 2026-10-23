@@ -10,7 +10,6 @@ import cinema.exception.DataException;
 import cinema.model.Booking;
 import cinema.model.Customer;
 import cinema.model.Showtime;
-import cinema.model.User;
 import cinema.service.BookingManager;
 import cinema.service.UserManager;
 import cinema.service.VenueManager;
@@ -36,16 +35,12 @@ public class RecordsMenu {
 
     public void viewUsers() {
         Screen.title("REGISTERED USERS (ADMIN)");
-        System.out.println("  " + String.format(User.TABLE_FORMAT, "ID", "NAME", "EMAIL", "ROLE", "STATUS") + "AGE");
-        Screen.line();
-        for (User user : userManager.getAllUsers()) {
-            System.out.println("  " + user.getDetails());   // Admin and Customer each describe themselves
-        }
+        AccountMenu.printAccounts(userManager.getAllUsers());
 
         Screen.section("CUSTOMER ACTIVITY");
-        System.out.println(String.format("  %-5s %-18s %-13s %8s %8s %16s",
-                "ID", "NAME", "REGISTERED", "BOOKINGS", "TICKETS", "TOTAL SPENT"));
-        Screen.line();
+        Table table = new Table(6, 16, 12, 8, 7, 14);
+        table.alignRight(3, 4, 5);
+        table.printHeader("ID", "NAME", "REGISTERED", "BOOKINGS", "TICKETS", "TOTAL SPENT");
         for (Customer c : userManager.getAllCustomers()) {
             int bookings = 0;
             int tickets = 0;
@@ -57,8 +52,8 @@ public class RecordsMenu {
                     spent += b.getAmountPaid();
                 }
             }
-            System.out.println(String.format("  %-5s %-18s %-13s %8d %8d %16s", c.getUserId(), c.getName(),
-                    Format.date(c.getRegisteredAt().toLocalDate()), bookings, tickets, Format.peso(spent)));
+            table.printRow(c.getUserId(), c.getName(), Format.date(c.getRegisteredAt().toLocalDate()),
+                    String.valueOf(bookings), String.valueOf(tickets), Format.peso(spent));
         }
         Screen.line();
         System.out.println("  " + userManager.getAllUsers().size() + " account(s), "
@@ -155,7 +150,7 @@ public class RecordsMenu {
         }
     }
 
-    // Three lines per booking, then the totals
+    // Four lines per booking, then the totals. Long names, titles and cinema names end with "...".
     private void printBookings(ArrayList<Booking> bookings) {
         if (bookings.isEmpty()) {
             Screen.info("No bookings yet.");
@@ -170,12 +165,14 @@ public class RecordsMenu {
             if (b.getPayment() != null) {
                 paidWith = b.getPayment().getDisplayName();
             }
-            System.out.println("  " + String.format("%-11s %-10s", b.getBookingId(), b.getStatus())
+            System.out.println("  " + Format.fit(b.getBookingId(), 10) + "  " + Format.fit(b.getStatus(), 9)
                     + "  " + Format.peso(b.getTotalPrice()) + " (" + paidWith + ")");
-            System.out.println("              " + b.getCustomer().getName() + " (" + b.getCustomer().getUserId() + ")"
-                    + "  |  " + s.getMovie().getTitle());
-            System.out.println("              " + venueManager.getCinemaName(s.getRoom()) + "  |  "
-                    + Format.shortDateTime(s.getStart()) + "  |  Seats: " + b.getSeatList());
+            // the title gets whatever room the name leaves on the line
+            String who = Format.shorten(b.getCustomer().getName(), 22) + " (" + b.getCustomer().getUserId() + ")";
+            System.out.println("              " + Format.shorten(who + "  |  " + s.getMovie().getTitle(), 61));
+            System.out.println("              " + Format.shorten(venueManager.getCinemaName(s.getRoom()), 35)
+                    + "  |  " + Format.shortDateTime(s.getStart()));
+            System.out.println("              Seats: " + b.getSeatList());
             if ("CONFIRMED".equals(b.getStatus())) {
                 confirmed++;
                 tickets += b.getSeats().size();
@@ -194,12 +191,12 @@ public class RecordsMenu {
             Screen.info("No payments or refunds yet.");
             return;
         }
-        System.out.println(String.format("  %-17s %-8s %-11s %-6s %-18s %12s",
-                "DATE AND TIME", "TYPE", "BOOKING", "USER", "METHOD", "AMOUNT"));
-        Screen.line();
+        Table table = new Table(16, 7, 10, 5, 17, 8);
+        table.alignRight(5);
+        table.printHeader("DATE AND TIME", "TYPE", "BOOKING", "USER", "METHOD", "AMOUNT");
         for (String[] r : rows) {
             if (r.length == 6) {
-                System.out.println(String.format("  %-17s %-8s %-11s %-6s %-18s %12s", r[0], r[1], r[2], r[3], r[4], r[5]));
+                table.printRow(r);
             }
         }
         System.out.println("  " + rows.size() + " transaction(s). Saved in " + FileManager.FOLDER + "/"
