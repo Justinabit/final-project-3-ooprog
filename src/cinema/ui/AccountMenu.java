@@ -1,19 +1,22 @@
 package cinema.ui;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 
 import cinema.exception.LoginException;
 import cinema.exception.ValidationException;
+import cinema.model.Admin;
 import cinema.model.Customer;
 import cinema.model.User;
 import cinema.service.UserManager;
 import cinema.util.ConsoleReader;
+import cinema.util.Format;
 import cinema.util.Validator;
 
 // [Member A] Menus for register / login / profile / admin account management.
 // This is where Scanner (ConsoleReader) is used; the logic itself goes in UserManager.
 public class AccountMenu {
-    private static final int MAX_LOGIN_ATTEMPTS = 3;
+    private static final int MAX_LOGIN_ATTEMPTS = 3;   // per visit to the login screen
 
     private UserManager userManager;
 
@@ -25,16 +28,17 @@ public class AccountMenu {
 
     public void register() {
         Screen.title("REGISTER A CUSTOMER ACCOUNT");
-        Screen.info("Leave a field blank to cancel.");
+        Screen.info("Leave a field blank to cancel. You must be at least " + Validator.MIN_ACCOUNT_AGE + " years old.");
         String name = askName("Full name: ");
         if (name == null) return;
         String email = askNewEmail("Email: ", null);
         if (email == null) return;
         String password = askNewPassword("Password");
         if (password == null) return;
-        int age = askAge("Age: ");
+        LocalDate birthDate = askBirthDate("Birthdate (yyyy-MM-dd, e.g. 2004-08-15): ");
+        if (birthDate == null) return;
         try {
-            userManager.registerCustomer(name, email, password, age);
+            userManager.registerCustomer(name, email, password, birthDate);
             Screen.success("Registration successful! You can now log in.");
         } catch (ValidationException e) {
             Screen.error("Registration failed: " + e.getMessage());
@@ -48,15 +52,20 @@ public class AccountMenu {
         } else {
             Screen.title("CUSTOMER LOGIN");
         }
-        Screen.info("Leave the email blank to go back.");
+        Screen.info("Leave it blank to go back.");
 
         for (int attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
-            String email = ConsoleReader.readLine("Email: ");
-            if (email.isEmpty()) return null;
+            String emailOrUsername;
+            if (adminLogin) {
+                emailOrUsername = ConsoleReader.readLine("Username or email: ");
+            } else {
+                emailOrUsername = ConsoleReader.readLine("Email: ");
+            }
+            if (emailOrUsername.isEmpty()) return null;
             String password = ConsoleReader.readLine("Password: ");
             try {
-                User user = userManager.login(email, password);
-                boolean isAdmin = "ADMIN".equals(user.getRole());
+                User user = userManager.login(emailOrUsername, password);
+                boolean isAdmin = user instanceof Admin;
                 if (adminLogin && !isAdmin) {
                     Screen.error("This is not an admin account. Please use Customer Login.");
                     return null;
@@ -69,6 +78,9 @@ public class AccountMenu {
                 return user;
             } catch (LoginException e) {
                 Screen.error("Login failed: " + e.getMessage());
+                if (e.getMessage().contains("locked")) {
+                    return null;   // no point trying again right now
+                }
                 int attemptsLeft = MAX_LOGIN_ATTEMPTS - attempt;
                 if (attemptsLeft > 0) {
                     Screen.info("Attempts left: " + attemptsLeft);
@@ -85,21 +97,26 @@ public class AccountMenu {
         boolean back = false;
         while (!back) {
             Screen.title("MY PROFILE");
-            System.out.println("  ID     : " + user.getUserId());
-            System.out.println("  Name   : " + user.getName());
-            System.out.println("  Email  : " + user.getEmail());
-            System.out.println("  Role   : " + user.getRole());
-            if (user instanceof Customer) {
-                System.out.println("  Age    : " + ((Customer) user).getAge());
+            System.out.println("  ID           : " + user.getUserId());
+            System.out.println("  Name         : " + user.getName());
+            System.out.println("  Email        : " + user.getEmail());
+            System.out.println("  Role         : " + user.getRole());
+            if (user instanceof Admin) {
+                System.out.println("  Username     : " + ((Admin) user).getUsername());
             }
+            if (user instanceof Customer) {
+                Customer c = (Customer) user;
+                System.out.println("  Birthdate    : " + Format.date(c.getBirthDate()) + " (age " + c.getAge() + ")");
+            }
+            System.out.println("  Member since : " + Format.date(user.getRegisteredAt().toLocalDate()));
             Screen.line();
             Screen.option(1, "Edit name");
             Screen.option(2, "Edit email");
             Screen.option(3, "Change password");
-            if (user instanceof Customer) {
-                Screen.option(4, "Edit age");
-            }
             Screen.option(0, "Back");
+            if (user instanceof Customer) {
+                Screen.info("To correct your birthdate, please ask an admin (bring a valid ID).");
+            }
             int choice = Screen.readChoice();
             switch (choice) {
                 case 1:
@@ -110,13 +127,6 @@ public class AccountMenu {
                     break;
                 case 3:
                     changePassword(user);
-                    break;
-                case 4:
-                    if (user instanceof Customer) {
-                        editAge((Customer) user);
-                    } else {
-                        Screen.error("Invalid choice. Try again.");
-                    }
                     break;
                 case 0:
                     back = true;
@@ -164,16 +174,6 @@ public class AccountMenu {
         }
     }
 
-    private void editAge(Customer customer) {
-        int age = askAge("New age: ");
-        try {
-            customer.setAge(age);
-            Screen.success("Age updated.");
-        } catch (ValidationException e) {
-            Screen.error(e.getMessage());
-        }
-    }
-
     // ---------- admin: manage accounts ----------
 
     public void manageAccounts() {
@@ -184,8 +184,10 @@ public class AccountMenu {
             Screen.option(2, "Search customers");
             Screen.option(3, "Deactivate a customer");
             Screen.option(4, "Reactivate a customer");
-            Screen.option(5, "Reset a customer's password");
-            Screen.option(6, "Create an admin account");
+            Screen.option(5, "Unlock an account (too many wrong passwords)");
+            Screen.option(6, "Reset a customer's password");
+            Screen.option(7, "Correct a customer's birthdate (check their ID)");
+            Screen.option(8, "Create an admin account");
             Screen.option(0, "Back");
             int choice = Screen.readChoice();
             switch (choice) {
@@ -202,9 +204,15 @@ public class AccountMenu {
                     changeCustomerStatus(true);
                     break;
                 case 5:
-                    resetCustomerPassword();
+                    unlockAccount();
                     break;
                 case 6:
+                    resetCustomerPassword();
+                    break;
+                case 7:
+                    correctBirthDate();
+                    break;
+                case 8:
                     createAdmin();
                     break;
                 case 0:
@@ -251,6 +259,20 @@ public class AccountMenu {
         Screen.success(customer.getName() + " is now " + statusText(active) + ".");
     }
 
+    private void unlockAccount() {
+        User user = userManager.findUser(ConsoleReader.readLine("Account ID (e.g. U-2): "));
+        if (user == null) {
+            Screen.error("No account with that ID.");
+            return;
+        }
+        if (!user.isLocked()) {
+            Screen.info(user.getName() + "'s account is not locked.");
+            return;
+        }
+        user.unlock();
+        Screen.success(user.getName() + "'s account is unlocked.");
+    }
+
     private void resetCustomerPassword() {
         Customer customer = chooseCustomer();
         if (customer == null) return;
@@ -265,6 +287,20 @@ public class AccountMenu {
         }
     }
 
+    private void correctBirthDate() {
+        Customer customer = chooseCustomer();
+        if (customer == null) return;
+        Screen.info(customer.getName() + "'s birthdate is " + Format.date(customer.getBirthDate()) + ".");
+        LocalDate birthDate = askBirthDate("Correct birthdate as shown on their ID (yyyy-MM-dd): ");
+        if (birthDate == null) return;
+        try {
+            customer.setBirthDate(birthDate);
+            Screen.success("Birthdate updated. " + customer.getName() + " is " + customer.getAge() + " years old.");
+        } catch (ValidationException e) {
+            Screen.error(e.getMessage());
+        }
+    }
+
     private void createAdmin() {
         Screen.section("NEW ADMIN ACCOUNT");
         Screen.info("Leave a field blank to cancel.");
@@ -272,11 +308,13 @@ public class AccountMenu {
         if (name == null) return;
         String email = askNewEmail("Email: ", null);
         if (email == null) return;
+        String username = askNewUsername();
+        if (username == null) return;
         String password = askNewPassword("Password");
         if (password == null) return;
         try {
-            userManager.registerAdmin(name, email, password);
-            Screen.success("Admin account created for " + name + ".");
+            userManager.registerAdmin(name, email, username, password);
+            Screen.success("Admin account created for " + Validator.cleanSpaces(name) + " (username " + username + ").");
         } catch (ValidationException e) {
             Screen.error(e.getMessage());
         }
@@ -303,9 +341,8 @@ public class AccountMenu {
         return "deactivated";
     }
 
-    // ---------- input helpers: keep asking until the value is valid ----------
+    // ---------- input helpers: keep asking until the value is valid (blank = cancel) ----------
 
-    // Returns null if the user leaves it blank (cancel)
     private String askName(String prompt) {
         while (true) {
             String name = ConsoleReader.readLine(prompt);
@@ -339,9 +376,30 @@ public class AccountMenu {
         }
     }
 
-    // Asks twice so a typo can't lock the user out. Returns null if left blank.
+    // Admin usernames must be unique
+    private String askNewUsername() {
+        while (true) {
+            String username = ConsoleReader.readLine("Username (4-20 letters or digits): ");
+            if (username.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
+            try {
+                Validator.validateUsername(username);
+                if (userManager.isUsernameTaken(username)) {
+                    throw new ValidationException("That username is already taken.");
+                }
+                return username;
+            } catch (ValidationException e) {
+                Screen.error(e.getMessage());
+            }
+        }
+    }
+
+    // Asks twice so a typo can't lock the user out
     private String askNewPassword(String label) {
-        Screen.info("Password rules: 8+ characters, at least one number and one uppercase letter.");
+        Screen.info("Password rules: " + Validator.MIN_PASSWORD_LENGTH + "-" + Validator.MAX_PASSWORD_LENGTH
+                + " characters with an uppercase letter, a lowercase letter and a number.");
         while (true) {
             String password = ConsoleReader.readLine(label + ": ");
             if (password.isEmpty()) {
@@ -361,12 +419,15 @@ public class AccountMenu {
         }
     }
 
-    private int askAge(String prompt) {
+    private LocalDate askBirthDate(String prompt) {
         while (true) {
-            int age = ConsoleReader.readInt(prompt);
+            String text = ConsoleReader.readLine(prompt);
+            if (text.isEmpty()) {
+                Screen.info("Cancelled.");
+                return null;
+            }
             try {
-                Validator.validateAge(age);
-                return age;
+                return Validator.validateBirthDate(text);
             } catch (ValidationException e) {
                 Screen.error(e.getMessage());
             }

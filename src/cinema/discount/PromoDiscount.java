@@ -11,5 +11,7 @@ public class PromoDiscount extends PercentageDiscount {
         this.promo = promo;
     }
 
+    public Promo getPromo() { return promo; }
+
     public String getName() { return "Promo " + promo.getCode() + " (" + getPercentOff() + "% off)"; }
 }

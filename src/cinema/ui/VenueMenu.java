@@ -148,8 +148,9 @@ public class VenueMenu {
         CinemaBranch branch = chooseBranch();
         if (branch == null) return;
         String name = ConsoleReader.readLine("Room name: ");
-        int rows = ConsoleReader.readInt("Number of rows (1-26): ");
-        int perRow = ConsoleReader.readInt("Seats per row (1-30): ");
+        int rows = ConsoleReader.readInt("Number of rows (" + VenueManager.MIN_ROWS + "-" + VenueManager.MAX_ROWS + "): ");
+        int perRow = ConsoleReader.readInt("Seats per row (" + VenueManager.MIN_SEATS_PER_ROW + "-"
+                + VenueManager.MAX_SEATS_PER_ROW + "): ");
         SeatLayoutStrategy layout = chooseLayout();
         try {
             CinemaRoom room = venueManager.addRoomToBranch(branch.getBranchId(), name, rows, perRow, layout);
@@ -227,7 +228,7 @@ public class VenueMenu {
             return;
         }
         try {
-            room.changeSeatType(seatId, choice == 2);
+            venueManager.changeSeatType(room, seatId, choice == 2, movieManager.getShowtimes());
             Seat seat = room.findSeat(seatId);
             Screen.success("Seat " + seat.getSeatNumber() + " is now " + seat.getSeatType() + ".");
             Screen.info("Bookings that were already made keep the price they paid.");

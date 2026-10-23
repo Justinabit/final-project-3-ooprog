@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 import cinema.exception.ValidationException;
 import cinema.layout.SeatLayoutStrategy;
-import cinema.layout.StandardLayout;
 import cinema.util.Validator;
 
 // [Member A] A room (hall) inside a branch. It owns a list of seats.
@@ -19,11 +18,6 @@ public class CinemaRoom {
     public CinemaRoom(String roomId, String roomName) throws ValidationException {
         this.roomId = roomId;
         setRoomName(roomName);
-    }
-
-    // Default layout: the last row is VIP (only when there is more than one row)
-    public void generateSeats(int rows, int seatsPerRow) {
-        generateSeats(rows, seatsPerRow, new StandardLayout());
     }
 
     // Creates seats A1, A2... B1, B2... The layout strategy decides which rows are VIP.
@@ -43,6 +37,44 @@ public class CinemaRoom {
         this.rows = rows;
         this.seatsPerRow = seatsPerRow;
         this.layoutName = layout.getName();
+    }
+
+    // Seat types as one letter per seat, in order: S = standard, V = VIP. Used by the data file.
+    public String getSeatCodes() {
+        String codes = "";
+        for (Seat seat : seats) {
+            if (seat.isVip()) {
+                codes += "V";
+            } else {
+                codes += "S";
+            }
+        }
+        return codes;
+    }
+
+    // Rebuilds the seats from saved seat codes (see getSeatCodes)
+    public void loadSeats(int rows, int seatsPerRow, String seatCodes, String layoutName) throws ValidationException {
+        if (seatCodes.length() != rows * seatsPerRow) {
+            throw new ValidationException("Room " + roomId + " should have " + (rows * seatsPerRow)
+                    + " seat codes but has " + seatCodes.length() + ".");
+        }
+        seats.clear();
+        int index = 0;
+        for (int r = 0; r < rows; r++) {
+            char rowLetter = (char) ('A' + r);
+            for (int s = 1; s <= seatsPerRow; s++) {
+                String seatId = rowLetter + String.valueOf(s);
+                if (seatCodes.charAt(index) == 'V') {
+                    seats.add(new VipSeat(seatId));
+                } else {
+                    seats.add(new StandardSeat(seatId));
+                }
+                index++;
+            }
+        }
+        this.rows = rows;
+        this.seatsPerRow = seatsPerRow;
+        this.layoutName = layoutName;
     }
 
     public Seat findSeat(String seatId) {

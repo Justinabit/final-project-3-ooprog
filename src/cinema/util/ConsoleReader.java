@@ -30,20 +30,25 @@ public class ConsoleReader {
         }
     }
 
-    // Keeps asking until the user types a valid decimal number
-    public static double readDouble(String prompt) {
+    // Keeps asking until the user types a money amount like 450, 450.50 or 1,250
+    // (digits only, at most 2 decimal places; no letters, minus signs or "1e3").
+    public static double readAmount(String prompt) {
         while (true) {
-            try {
-                return Double.parseDouble(readLine(prompt));
-            } catch (NumberFormatException e) {
-                System.out.println("  [ !! ] Please enter a valid number.");
+            String text = readLine(prompt).replace(",", "");
+            if (text.matches("\\d{1,9}(\\.\\d{1,2})?")) {
+                return Double.parseDouble(text);
             }
+            System.out.println("  [ !! ] Please enter an amount like 450 or 450.50.");
         }
     }
 
-    // Returns true for "y" or "yes"
+    // Keeps asking until the user answers y / yes or n / no
     public static boolean readYesNo(String prompt) {
-        String input = readLine(prompt);
-        return input.equalsIgnoreCase("y") || input.equalsIgnoreCase("yes");
+        while (true) {
+            String input = readLine(prompt);
+            if (input.equalsIgnoreCase("y") || input.equalsIgnoreCase("yes")) return true;
+            if (input.equalsIgnoreCase("n") || input.equalsIgnoreCase("no")) return false;
+            System.out.println("  [ !! ] Please answer y or n.");
+        }
     }
 }

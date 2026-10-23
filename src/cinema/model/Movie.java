@@ -33,13 +33,13 @@ public class Movie {
     public String getStatus() { return status; }
 
     public void setTitle(String title) throws ValidationException {
-        Validator.validateRequired("Title", title);
-        this.title = title.trim();
+        Validator.validateTitle(title);
+        this.title = Validator.cleanSpaces(title);
     }
 
+    // Must be one of Validator.GENRES
     public void setGenre(String genre) throws ValidationException {
-        Validator.validateRequired("Genre", genre);
-        this.genre = genre.trim();
+        this.genre = Validator.validateGenre(genre);
     }
 
     public void setAgeRating(String ageRating) throws ValidationException {

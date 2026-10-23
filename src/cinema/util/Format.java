@@ -1,5 +1,6 @@
 package cinema.util;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -11,6 +12,8 @@ public class Format {
 
     private static final DateTimeFormatter LONG_DATE_TIME =
             DateTimeFormatter.ofPattern("EEE, MMM d, yyyy  h:mm a", Locale.ENGLISH);
+    private static final DateTimeFormatter DATE_ONLY =
+            DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
     private static final DateTimeFormatter SHORT_DATE_TIME =
             DateTimeFormatter.ofPattern("EEE, MMM d  hh:mm a", Locale.ENGLISH);
 
@@ -22,6 +25,11 @@ public class Format {
     // -> "Thu, Oct 22, 2026  2:00 PM"
     public static String dateTime(LocalDateTime time) {
         return time.format(LONG_DATE_TIME);
+    }
+
+    // -> "Aug 15, 2004"
+    public static String date(LocalDate day) {
+        return day.format(DATE_ONLY);
     }
 
     // -> "Thu, Oct 22  02:00 PM" (same length every time, so lists line up)

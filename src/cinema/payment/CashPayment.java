@@ -15,20 +15,10 @@ public class CashPayment implements PaymentStrategy {
 
     public void pay(double amount) throws PaymentException {
         PaymentStrategy.validateAmount(amount);
-        double tendered = ConsoleReader.readDouble("Enter cash amount tendered (PHP): ");
-
-        // ConsoleReader accepts "NaN", "Infinity" and "1e300", so check what was typed before using it.
-        if (Double.isNaN(tendered) || Double.isInfinite(tendered)) {
-            throw new PaymentException("Invalid cash amount.");
-        }
-        if (tendered <= 0) {
-            throw new PaymentException("The cash amount must be more than " + Format.peso(0) + ".");
-        }
+        // readAmount only accepts amounts like 500 or 500.50 (no "NaN", "-100", "1e3" or 3 decimals)
+        double tendered = ConsoleReader.readAmount("Enter cash amount tendered (PHP): ");
         if (tendered > MAX_TENDERED) {
             throw new PaymentException("That cash amount is too large. The maximum is " + Format.peso(MAX_TENDERED) + ".");
-        }
-        if (BigDecimal.valueOf(tendered).stripTrailingZeros().scale() > 2) {
-            throw new PaymentException("Please enter the cash amount with at most 2 decimal places.");
         }
 
         // BigDecimal compares exact centavos, so floating-point error can't reject exact cash.

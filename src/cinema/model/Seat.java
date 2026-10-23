@@ -18,7 +18,6 @@ public abstract class Seat {
         return basePrice + getExtraCharge();
     }
 
-    public String getSeatId() { return seatId; }
     public String getSeatNumber() { return seatId; }
 
     public boolean isVip() {
